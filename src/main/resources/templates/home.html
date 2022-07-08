@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="https://www.thymeleaf.org/">
+<head>
+  <meta charset="ISO-8859-1"/>
+  <title>结果绘制</title>
+</head>
+<style>
+  .box {
+    display: -webkit-flex; /* Safari */
+    display: flex;
+  }
+</style>
+<body>
+<div class="box">
+  <!--  left -->
+  <ul th:width="90">
+    <li th:each="file:${inputFiles}">
+      <a th:href="@{'home?case=' + ${file}}" th:text="'case ' + ${file}"></a>
+    </li>
+  </ul>
+  <!-- right -->
+  <div th:utext="${svg}">
+  </div>
+</div>
+</body>
+</html>
