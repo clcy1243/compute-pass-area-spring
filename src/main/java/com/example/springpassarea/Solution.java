@@ -4,10 +4,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Created at 2022/7/8 16:15
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
 public class Solution {
     // 精度倍数
     public static int SCALE = 100;
+    public static boolean isEnableSinglePointMapMerge = true;
 
     public static List<List<List<Integer>>> computePassArea(List<Input> inputs) {
         /*
@@ -79,7 +82,47 @@ public class Solution {
             passMap.removeLineMiddlePoint();
         }
 
-        return passMapList.stream().map(x -> x.toList()).collect(Collectors.toList());
+        // 合并单点图
+
+        List<PassMap> multiPointMap = new ArrayList<>();
+        List<PassMap> singlePointMap = new ArrayList<>();
+
+        for (PassMap passMap : passMapList) {
+            if (passMap.edges.size() > 1) {
+                multiPointMap.add(passMap);
+            } else {
+                singlePointMap.add(passMap);
+            }
+        }
+
+        if (isEnableSinglePointMapMerge && singlePointMap.size() > 1) {
+            for (int i = 0; i < singlePointMap.size() - 1; i++) {
+                for (int j = i + 1; j < singlePointMap.size(); j++) {
+                    Input p1 = singlePointMap.get(i).edges.get(0);
+                    Input p2 = singlePointMap.get(j).edges.get(0);
+                    Line line = new Line(p1.x, p1.y, p2.x, p2.y);
+
+                    if (line.getMiddlePoint().isEmpty()) {
+                        singlePointMap.remove(j);
+                        singlePointMap.remove(i);
+                        i--;
+
+                        PassMap newMap = new PassMap(p1, matrix);
+                        newMap.edges.add(p2);
+
+                        multiPointMap.add(newMap);
+                        break;
+                    }
+                }
+
+                if (singlePointMap.size() == 1) {
+                    break;
+                }
+            }
+        }
+
+        return Stream.of(multiPointMap, singlePointMap).flatMap(Collection::stream)
+                .map(x -> x.toList()).collect(Collectors.toList());
     }
 
     /**
@@ -303,7 +346,7 @@ public class Solution {
             if (inNewPass < inOldPass) {
                 return false;
             }
-            if (inNewFail > inOldFail +3) {
+            if (inNewFail > inOldFail + 3) {
                 return false;
             }
             return true;
@@ -384,9 +427,12 @@ public class Solution {
         }
 
         public void removeLineMiddlePoint() {
-
+            // 图形优化时，应先对边上的点进行清楚，再进行下一步的图形简化，
+            // 有 case 说明简化时有可能因为边上的顶点移除和图形简化在一步内做，
+            // 导致逐渐包含fail点最终导致fail点过多的问题
             int storePoint = 0;
             int i1 = 0;
+            boolean removePointAtLine = true;
             while (edges.size() > 2) {
                 if (i1 >= edges.size()) {
                     i1 = 0;
@@ -406,7 +452,14 @@ public class Solution {
                 Input p3 = edges.get(i3);
 
                 // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
-                if (PassMap.removePointCompute(matrix, edges, i1, i2, i3)) { // todo
+                boolean couldRemoveP2 = false;
+                if (removePointAtLine) {
+                    Line line = new Line(p1.x, p1.y, p3.x, p3.y);
+                    couldRemoveP2 = line.contains(p2.x, p2.y);
+                } else {
+                    couldRemoveP2 = PassMap.removePointCompute(matrix, edges, i1, i2, i3);
+                }
+                if (couldRemoveP2) {
                     // 能删除则更新存档点为p1，以 p1 为起始点再次执行
                     List<Input> newEdges = new ArrayList<>(edges);
                     newEdges.remove(i2);
@@ -421,11 +474,16 @@ public class Solution {
                     if (i1 >= edges.size()) {
                         i1 = 0;
                     }
+                    // 如果再次遇到存档点，则结束处理
                     if (i1 == storePoint) {
-                        break;
+                        // 环形遍历控制，第一遍只移除边上的点，第二遍简化图形
+                        if (removePointAtLine) {
+                            removePointAtLine = false;
+                        } else {
+                            break;
+                        }
                     }
                 }
-                // 如果再次遇到存档点，则结束处理
             }
 
             //if (edges.size() > 2) {
@@ -485,6 +543,8 @@ public class Solution {
         private final int y2;
 
         private final boolean vector;
+        private BigDecimal n; // 斜率
+        private BigDecimal c; // 偏移量
 
         public Line(int x1, int y1, int x2, int y2) {
             this.x1 = x1;
@@ -513,14 +573,51 @@ public class Solution {
             return false;
         }
 
-        public BigDecimal getN() {
+        private boolean isIntegerValue(BigDecimal bd) {
+            return bd.signum() == 0 || bd.scale() <= 0 || bd.stripTrailingZeros().scale() <= 0;
+        }
+        public List<int[]> getMiddlePoint() {
+            List<int[]> list = new ArrayList<>();
             if (x1 == x2) {
-                return BigDecimal.valueOf(0);
+                int minY = Math.min(y1, y2);
+                int maxY = Math.max(y1, y2);
+                if (minY + 1 >= maxY) {
+                    return list;
+                }
+
+                for (int i = minY+1;i < maxY;i++) {
+                    list.add(new int[]{x1, i});
+                }
+
+            } else {
+                int minX = Math.min(x1, x2);
+                int maxX = Math.max(x1, x2);
+                if (minX + 1 >= maxX) {
+                    return list;
+                }
+                for (int i = minX+1;i < maxX;i++) {
+                    BigDecimal y = getN().multiply(BigDecimal.valueOf(i)).add(getC()).setScale(6, RoundingMode.HALF_UP);
+                    if (isIntegerValue(y)) {
+                        list.add(new int[]{i, y.intValue()});
+                    }
+                }
+            }
+            return list;
+        }
+
+        public BigDecimal getN() {
+            if (n != null) {
+                return n;
+            }
+            if (x1 == x2) {
+                n = BigDecimal.valueOf(0);
+                return n;
             }
 
-            return BigDecimal.valueOf(y2 - y1)
+            n = BigDecimal.valueOf(y2 - y1)
                     .divide(BigDecimal.valueOf(x2 - x1), 6, RoundingMode.HALF_UP)
                     .setScale(6, RoundingMode.HALF_UP);
+            return n;
             //
             //if (x1 < x2) {
             //    return BigDecimal.valueOf(y2 - y1)
@@ -534,9 +631,13 @@ public class Solution {
         }
 
         public BigDecimal getC() {
+            if (c != null) {
+                return c;
+            }
             // y1 - n * x1
-            return BigDecimal.valueOf(y1).subtract(getN().multiply(BigDecimal.valueOf(x1)))
+            c = BigDecimal.valueOf(y1).subtract(getN().multiply(BigDecimal.valueOf(x1)))
                     .setScale(6, RoundingMode.HALF_UP);
+            return c;
         }
 
         @Override
