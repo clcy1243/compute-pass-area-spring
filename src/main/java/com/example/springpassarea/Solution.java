@@ -83,7 +83,7 @@ public class Solution {
     }
 
     /**
-     * todo
+     * todo 目前这个算法因为精度问题，如果点在边上会存在判读不准确的情况，所以在下面用到的时候，补充了点在边上的判断
      * Performs the even-odd-rule Algorithm to find out whether a point is in a given polygon.
      * This runs in O(n) where n is the number of edges of the polygon.
      *
