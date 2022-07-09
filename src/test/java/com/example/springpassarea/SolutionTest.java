@@ -29,5 +29,26 @@ class SolutionTest {
         line2 = new Line(3, 4, 5, 5);
 
         assertTrue(line1.equals(line2));
+
+        line1 = new Line(0, 1, 0, 2);
+        line2 = new Line(0, 4, 0, 5);
+
+        assertTrue(line1.equals(line2));
+    }
+
+    @Test
+    void pointInPolygon() {
+        int[][] map = new int[][]{
+                {0, 0},
+                {0, 3},
+                {3, 3},
+                {3, 0}
+        };
+
+        assertTrue(Solution.pointInPolygon(map, new int[]{0, 0}));
+        assertTrue(Solution.pointInPolygon(map, new int[]{0, 1}));
+        assertTrue(Solution.pointInPolygon(map, new int[]{0, 2}));
+        assertTrue(Solution.pointInPolygon(map, new int[]{2, 2}));
+        assertFalse(Solution.pointInPolygon(map, new int[]{2, 4}));
     }
 }

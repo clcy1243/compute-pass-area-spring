@@ -15,8 +15,11 @@ class ThymeleafControllerTest {
 
     @Test
     void home() {
+        // case 22
+        // case 33
+        // case 40
 
-        String path = "cases/1.in";
+        String path = "cases/2.in";
         List<Input> inputs = InputReader.readFromFile(path);
         List<List<List<Integer>>> lines = Solution.computePassArea(inputs);
         //String svg = Draw.toSvg(inputs, lines);
