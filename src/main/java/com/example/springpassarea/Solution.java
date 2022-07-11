@@ -4,12 +4,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Created at 2022/7/8 16:15
@@ -86,7 +82,7 @@ public class Solution {
         return passMapList.stream()
                 .filter(x -> x.edges.size() > 2)
                 .map(x -> x.toList())
-                .collect(Collectors.toList());
+                .collect(java.util.stream.Collectors.toList());
 
         // 合并单点图
 
@@ -249,7 +245,7 @@ public class Solution {
             int[] p = new int[]{point.x*SCALE, point.y*SCALE};
             int[][] list = inputs.stream()
                     .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
-                    .collect(Collectors.toList())
+                    .collect(java.util.stream.Collectors.toList())
                     .toArray(new int[inputs.size()][]);
             return pointInPolygon(list, p); // todo
         }
@@ -278,7 +274,7 @@ public class Solution {
             // 2.2 构建新旧图，由于精度问题，在边上的点和在图内的点需要分别计算
             int[][] oldMap = inputs.stream()
                     .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
-                    .collect(Collectors.toList())
+                    .collect(java.util.stream.Collectors.toList())
                     .toArray(new int[inputs.size()][]);
             List<Line> oldLines = new ArrayList<>();
             for (int i = 0; i < inputs.size(); i++) {
@@ -297,7 +293,7 @@ public class Solution {
             newInputs.remove(i2);
             int[][] newMap = newInputs.stream()
                     .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
-                    .collect(Collectors.toList())
+                    .collect(java.util.stream.Collectors.toList())
                     .toArray(new int[newInputs.size()][]);
 
             List<Line> newLines = new ArrayList<>();
@@ -538,7 +534,7 @@ public class Solution {
         public List<List<Integer>> toList() {
             return edges.stream()
                     .map(p -> Arrays.asList(p.x, p.y))
-                    .collect(Collectors.toList());
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 
