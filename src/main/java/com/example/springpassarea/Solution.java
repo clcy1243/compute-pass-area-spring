@@ -82,47 +82,53 @@ public class Solution {
             passMap.removeLineMiddlePoint();
         }
 
+
+        return passMapList.stream()
+                .filter(x -> x.edges.size() > 2)
+                .map(x -> x.toList())
+                .collect(Collectors.toList());
+
         // 合并单点图
 
-        List<PassMap> multiPointMap = new ArrayList<>();
-        List<PassMap> singlePointMap = new ArrayList<>();
-
-        for (PassMap passMap : passMapList) {
-            if (passMap.edges.size() > 1) {
-                multiPointMap.add(passMap);
-            } else {
-                singlePointMap.add(passMap);
-            }
-        }
-
-        if (isEnableSinglePointMapMerge && singlePointMap.size() > 1) {
-            for (int i = 0; i < singlePointMap.size() - 1; i++) {
-                for (int j = i + 1; j < singlePointMap.size(); j++) {
-                    Input p1 = singlePointMap.get(i).edges.get(0);
-                    Input p2 = singlePointMap.get(j).edges.get(0);
-                    Line line = new Line(p1.x, p1.y, p2.x, p2.y);
-
-                    if (line.getMiddlePoint().isEmpty()) {
-                        singlePointMap.remove(j);
-                        singlePointMap.remove(i);
-                        i--;
-
-                        PassMap newMap = new PassMap(p1, matrix);
-                        newMap.edges.add(p2);
-
-                        multiPointMap.add(newMap);
-                        break;
-                    }
-                }
-
-                if (singlePointMap.size() == 1) {
-                    break;
-                }
-            }
-        }
-
-        return Stream.of(multiPointMap, singlePointMap).flatMap(Collection::stream)
-                .map(x -> x.toList()).collect(Collectors.toList());
+        //List<PassMap> multiPointMap = new ArrayList<>();
+        //List<PassMap> singlePointMap = new ArrayList<>();
+        //
+        //for (PassMap passMap : passMapList) {
+        //    if (passMap.edges.size() > 1) {
+        //        multiPointMap.add(passMap);
+        //    } else {
+        //        singlePointMap.add(passMap);
+        //    }
+        //}
+        //
+        //if (isEnableSinglePointMapMerge && singlePointMap.size() > 1) {
+        //    for (int i = 0; i < singlePointMap.size() - 1; i++) {
+        //        for (int j = i + 1; j < singlePointMap.size(); j++) {
+        //            Input p1 = singlePointMap.get(i).edges.get(0);
+        //            Input p2 = singlePointMap.get(j).edges.get(0);
+        //            Line line = new Line(p1.x, p1.y, p2.x, p2.y);
+        //
+        //            if (line.getMiddlePoint().isEmpty()) {
+        //                singlePointMap.remove(j);
+        //                singlePointMap.remove(i);
+        //                i--;
+        //
+        //                PassMap newMap = new PassMap(p1, matrix);
+        //                newMap.edges.add(p2);
+        //
+        //                multiPointMap.add(newMap);
+        //                break;
+        //            }
+        //        }
+        //
+        //        if (singlePointMap.size() == 1) {
+        //            break;
+        //        }
+        //    }
+        //}
+        //
+        //return Stream.of(multiPointMap, singlePointMap).flatMap(Collection::stream)
+        //        .map(x -> x.toList()).collect(Collectors.toList());
     }
 
     /**
@@ -343,13 +349,17 @@ public class Solution {
                 }
             }
             // 4. 新旧包含点位对比
-            if (inNewPass < inOldPass) {
-                return false;
-            }
-            if (inNewFail > inOldFail + 3) {
-                return false;
-            }
-            return true;
+            int addScore = p1==p3 ?  6 : 3 // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
+                    + (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
+                    + (inNewPass - inOldPass) * 5; // 多的pass点的分数
+            return addScore>=0;
+            //if (inNewPass < inOldPass) {
+            //    return false;
+            //}
+            //if (inNewFail > inOldFail + 3) {
+            //    return false;
+            //}
+            //return true;
         }
 
         private static boolean linesContainsPoint(List<Line> lines, int x, int y) {
