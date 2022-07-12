@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,8 +75,69 @@ public class Solution {
                 }
             }
         }
+        List<PassMap> newPassMapList = new ArrayList<>();
         for (PassMap passMap : passMapList) {
-            passMap.removeLineMiddlePoint();
+            // 分为两部，第一步去掉边上的点，第二步减少顶点
+            passMap.removePointAtLine();
+            // 减少顶点前需要判断多边形是否有完全重合的线，且连接两部分图形的，如果有则删除，此时会生成新的图
+
+            // 第一找到一个重复存在的点，且 index 差值大于2，
+            // 第二找到这个点的下一个点是否也是重复存在切index 差值大于2 的点
+            for (int i = 0; i < passMap.edges.size(); i++) {
+                int lastIndex = passMap.edges.lastIndexOf(passMap.edges.get(i));
+                if (lastIndex - i > 2 && passMap.edges.lastIndexOf(passMap.edges.get(i+1)) - i-1 > 2) {
+                    // 此线需要附加条件，
+                    //  1. 线上不能有pass点
+                    //  2. 线的两侧也应该是重合线
+                    Input p1 = passMap.edges.get(i);
+                    Input p2 = passMap.edges.get(i+1);
+                    Line line = new Line(p1.x, p1.y, p2.x, p2.y);
+                    if (!line.getMiddlePoint().isEmpty()) {
+                        continue;
+                    }
+                    Input fp1 = passMap.edges.get(i==0 ? passMap.edges.size() -1 : i-1);
+                    Input fp2 = passMap.edges.get(lastIndex+1);
+                    Line fl1 = new Line(p1.x, p1.y, fp1.x, fp1.y);
+                    Line fl2 = new Line(p1.x, p1.y, fp2.x, fp2.y);
+
+                    Input bp1 = passMap.edges.get(i+2);
+                    Input bp2 = passMap.edges.get(lastIndex-2);
+                    Line bl1 = new Line(p2.x, p2.y, bp1.x, bp1.y);
+                    Line bl2 = new Line(p2.x, p2.y, bp2.x, bp2.y);
+
+
+                    if (!fl1.equals(fl2) || !bl1.equals(bl2)) {
+                        continue;
+                    }
+
+                    // 此时 要把edge 分成两个list，第一个 0-i + lastIndex+1 - size -1
+                    // 第二个 i+2 - lastIndex -1
+                    List<Input> map1 = new ArrayList<>();
+                    List<Input> map2 = new ArrayList<>();
+
+                    for (int j = 0; j < passMap.edges.size(); j++) {
+                        if (j <= i || j > lastIndex) {
+                            map1.add(passMap.edges.get(j));
+                        } else if (j >= i+1 && j < lastIndex - 1) {
+                            map2.add(passMap.edges.get(j));
+                        }
+                    }
+
+                    passMap.edges = map1;
+
+                    PassMap newPassMap = new PassMap(map2.get(0), matrix);
+                    newPassMap.edges = map2;
+
+                    newPassMapList.add(newPassMap);
+                    break; // todo 目前只做一次分割
+                }
+            }
+        }
+        passMapList.addAll(newPassMapList);
+
+        for (PassMap passMap : passMapList) {
+            // 分为两部，第一步去掉边上的点，第二步减少顶点
+            passMap.removePointCompute();
         }
 
 
@@ -216,7 +278,7 @@ public class Solution {
 
     public static class PassMap {
 
-        private List<Input> inputs;
+        //private List<Input> inputs;
         private final Matrix matrix;
         private List<Input> edges = new ArrayList<>();
 
@@ -250,7 +312,9 @@ public class Solution {
             return pointInPolygon(list, p); // todo
         }
 
-        public static boolean removePointCompute(Matrix matrix, List<Input> inputs, int i1, int i2, int i3) {
+        // 以连续三点为基准计算是否可以去掉中间一点
+        // 同理可以计算中间两点或中间三点（针对一个 pass 凸起需要多三条边的情）
+        public static boolean removePointCompute3(Matrix matrix, List<Input> inputs, int i1, int i2, int i3) {
 
             Input p1 = inputs.get(i1);
             Input p2 = inputs.get(i2);
@@ -358,6 +422,124 @@ public class Solution {
             //return true;
         }
 
+
+        public static boolean removePointComputeWithPointNum(Matrix matrix, List<Input> inputs, int currentIndex, int pointNum) {
+            if (pointNum < 3 || inputs.size() <= pointNum) {
+                return false;
+            }
+
+            Input p1 = inputs.get(currentIndex);
+
+            //List<Input> newEdges = new ArrayList<>(edges);
+            //newEdges.remove(i2);
+            // 1. 以 p1 p2 p3 三点所占用的空间，得到一个矩形，
+            int minX = p1.x;
+            int minY = p1.y;
+            int maxX = p1.x;
+            int maxY = p1.y;
+
+            for (int j = currentIndex+1; j <currentIndex+pointNum; j++) {
+                Input p = inputs.get(j%inputs.size());
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            }
+
+            // 2.1 拿到矩形内所有的点
+            List<int[]> points = new ArrayList<>();
+            for (int m = minX; m <= maxX; m++) {
+                for (int n = minY; n <= maxY; n++) {
+                    points.add(new int[]{m,n});
+                }
+            }
+
+            // 2.2 构建新旧图，由于精度问题，在边上的点和在图内的点需要分别计算
+            int[][] oldMap = inputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[inputs.size()][]);
+            List<Line> oldLines = new ArrayList<>();
+            for (int i = 0; i < inputs.size(); i++) {
+                int j = i+1;
+                if (j == inputs.size()) {
+                    j = 0;
+                }
+                Input pa = inputs.get(i);
+                Input pb = inputs.get(j);
+                Line line = new Line(pa.x, pa.y, pb.x, pb.y);
+                oldLines.add(line);
+            }
+
+            List<Input> newInputs = new ArrayList<>(inputs);
+
+            java.util.stream.IntStream.rangeClosed(currentIndex + 1, currentIndex + pointNum - 2)
+                    .map(x -> x % inputs.size())
+                    .boxed()
+                    .sorted(Comparator.reverseOrder())
+                    .forEach(x -> newInputs.remove((int) x));
+
+            int[][] newMap = newInputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[newInputs.size()][]);
+
+            List<Line> newLines = new ArrayList<>();
+            for (int i = 0; i < newInputs.size(); i++) {
+                int j = i+1;
+                if (j == newInputs.size()) {
+                    j = 0;
+                }
+                Input pa = newInputs.get(i);
+                Input pb = newInputs.get(j);
+                Line line = new Line(pa.x, pa.y, pb.x, pb.y);
+                newLines.add(line);
+            }
+
+            // 3. 分别在保留 p2 和 去掉 p2 的情况下进行点是否在图内的遍历
+            int inOldPass = 0;
+            int inOldFail = 0;
+            int inNewPass = 0;
+            int inNewFail = 0;
+            for (int[] point : points) {
+                // 3.1 如果点在矩阵中不存在，则不计算
+                Input mPoint = matrix.get(point[0], point[1]);
+                int[] cPoint = new int[]{point[0]*SCALE, point[1]*SCALE};
+                if (mPoint == null) {
+                    continue;
+                }
+                // 3.2
+                boolean isPass = mPoint.pass;
+                boolean inOld = linesContainsPoint(oldLines, point[0], point[1]) || Solution.pointInPolygon(oldMap, cPoint);
+                boolean inNew = linesContainsPoint(newLines, point[0], point[1]) || Solution.pointInPolygon(newMap, cPoint);
+                if (isPass && inOld) { // 是pass 点且在图内
+                    inOldPass++;
+                } else if (isPass && !inOld) { // 是pass 点且不在图内
+                    //oldScore -= 100000;
+                } else if (!isPass && inOld) { // 不是pass 点但在图内
+                    inOldFail ++;
+                } else { // 不是pass 点且不在图内
+                    //oldScore += 1;
+                }
+
+                if (isPass && inNew) { // 是pass 点且在图内
+                    inNewPass++;
+                } else if (isPass && !inNew) { // 是pass 点且不在图内
+                    //newScore -= 100000;
+                } else if (!isPass && inNew) { // 不是pass 点但在图内
+                    inNewFail ++;
+                } else { // 不是pass 点且不在图内
+                    //newScore += 1;
+                }
+            }
+
+            // 4. 新旧包含点位对比
+            int addScore =p1.equals(inputs.get((currentIndex+pointNum -1) % inputs.size())) ? (pointNum - 1) * 3 : (pointNum - 2) * 3 // 一条边的分数, 假设 p1 p2 相同，实际上会少两条边
+                    + (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
+                    + (inNewPass - inOldPass) * 5; // 多的pass点的分数
+            return addScore>=0;
+        }
+
         private static boolean linesContainsPoint(List<Line> lines, int x, int y) {
             for (Line line : lines) {
                 if (line.contains(x, y)) {
@@ -406,7 +588,7 @@ public class Solution {
 
                     counter++;
                     if (counter > 8) {
-                        System.out.println("single point:" + inputToString(firstPoint));
+                        //System.out.println("single point:" + inputToString(firstPoint));
                         return true;
                     }
 
@@ -420,9 +602,9 @@ public class Solution {
                     i = -1;
                 }
             }
-            System.out.println(
-                    inputToString(firstPoint) + "------" + inputToString(lastPoint) + "--"
-                            + inputToString(currentPoint) + "->" + inputToString(nextPoint));
+            //System.out.println(
+            //        inputToString(firstPoint) + "------" + inputToString(lastPoint) + "--"
+            //                + inputToString(currentPoint) + "->" + inputToString(nextPoint));
 
             if (firstPoint.equals(nextPoint)) {
                 return true;
@@ -432,13 +614,9 @@ public class Solution {
             }
         }
 
-        public void removeLineMiddlePoint() {
-            // 图形优化时，应先对边上的点进行清楚，再进行下一步的图形简化，
-            // 有 case 说明简化时有可能因为边上的顶点移除和图形简化在一步内做，
-            // 导致逐渐包含fail点最终导致fail点过多的问题
+        public void removePointAtLine() {
             int storePoint = 0;
             int i1 = 0;
-            boolean removePointAtLine = true;
             while (edges.size() > 2) {
                 if (i1 >= edges.size()) {
                     i1 = 0;
@@ -459,18 +637,14 @@ public class Solution {
 
                 // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
                 boolean couldRemoveP2 = false;
-                if (removePointAtLine) {
-                    Line line = new Line(p1.x, p1.y, p3.x, p3.y);
-                    couldRemoveP2 = line.contains(p2.x, p2.y);
-                } else {
-                    couldRemoveP2 = PassMap.removePointCompute(matrix, edges, i1, i2, i3);
-                }
+                Line line = new Line(p1.x, p1.y, p3.x, p3.y);
+                couldRemoveP2 = line.contains(p2.x, p2.y);
                 if (couldRemoveP2) {
                     // 能删除则更新存档点为p1，以 p1 为起始点再次执行
                     List<Input> newEdges = new ArrayList<>(edges);
                     newEdges.remove(i2);
 
-                    System.out.println("remove point:" + inputToString(p2));
+                    //System.out.println("remove point:" + inputToString(p2));
                     edges = newEdges;
                     storePoint = i1;
                     // 此处 p1 保持不变，所以 i1 不变
@@ -482,46 +656,104 @@ public class Solution {
                     }
                     // 如果再次遇到存档点，则结束处理
                     if (i1 == storePoint) {
-                        // 环形遍历控制，第一遍只移除边上的点，第二遍简化图形
-                        if (removePointAtLine) {
-                            removePointAtLine = false;
-                        } else {
-                            break;
-                        }
+                        break;
                     }
                 }
             }
 
-            //if (edges.size() > 2) {
-            //
-            //
-            //    List<Integer> waitRemove = new ArrayList<>();
-            //    for (int i = 0; i < edges.size() - 2; i++) {
-            //        // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
-            //
-            //        Input p1 = edges.get(i);
-            //        Input p2 = edges.get(i + 1);
-            //        Input p3 = edges.get(i + 2);
-            //
-            //        Line line1 = new Line(p1.x, p1.y, p2.x, p2.y);
-            //        Line line2 = new Line(p2.x, p2.y, p3.x, p3.y);
-            //
-            //        if (line1.equals(line2)) {
-            //            waitRemove.add(i + 1);
-            //        }
-            //    }
-            //    if (waitRemove.isEmpty()) {
-            //        return false;
-            //    } else {
-            //        waitRemove.sort(Comparator.reverseOrder());
-            //        waitRemove.forEach(i -> {
-            //            System.out.println("remove point:" + inputToString(edges.get(i)));
-            //            edges.remove((int) i);
-            //        });
-            //        return true;
-            //    }
-            //}
-            //return false;
+        }
+
+        public void removePointCompute() {
+            // 图形优化时，应先对边上的点进行清楚，再进行下一步的图形简化，
+            // 有 case 说明简化时有可能因为边上的顶点移除和图形简化在一步内做，
+            // 导致逐渐包含fail点最终导致fail点过多的问题
+            int storePoint = 0;
+            int i1 = 0;
+            while (edges.size() > 2) {
+                if (i1 >= edges.size()) {
+                    i1 = 0;
+                }
+                // 取临近三个点
+                int i2 = i1+1;
+                if (i2 >= edges.size()) {
+                    i2 = 0;
+                }
+                int i3 = i2+1;
+                if (i3 >= edges.size()) {
+                    i3 = 0;
+                }
+
+                Input p1 = edges.get(i1);
+                Input p2 = edges.get(i2);
+                Input p3 = edges.get(i3);
+
+                // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
+                boolean couldRemoveP2 = PassMap.removePointCompute3(matrix, edges, i1, i2, i3);
+                if (couldRemoveP2) {
+                    // 能删除则更新存档点为p1，以 p1 为起始点再次执行
+                    List<Input> newEdges = new ArrayList<>(edges);
+                    newEdges.remove(i2);
+
+                    //System.out.println("remove point:" + inputToString(p2));
+                    edges = newEdges;
+                    storePoint = Math.min(i1, edges.size() - 1 );;
+                    // 此处 p1 保持不变，所以 i1 不变
+                } else {
+                    // 不能则以 p2 为起始点继续执行
+                    i1++;
+                    if (i1 >= edges.size()) {
+                        i1 = 0;
+                    }
+                    // 如果再次遇到存档点，则结束处理
+                    if (i1 == storePoint) {
+                        // 环形遍历控制，第一遍只移除边上的点，第二遍简化图形
+                        break;
+                    }
+                }
+            }
+
+
+            storePoint = 0;
+            i1 = 0;
+            int pointNum = 5;
+            while (edges.size() > 2 && pointNum >= 3 && edges.size() >= pointNum) {
+                if (i1 >= edges.size()) {
+                    i1 = 0;
+                }
+
+                // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
+                boolean couldRemove = PassMap.removePointComputeWithPointNum(matrix, edges, i1, pointNum);
+                if (couldRemove) {
+                    // 能删除则更新存档点为p1，以 p1 为起始点再次执行
+                    List<Input> newEdges = new ArrayList<>(edges);
+
+                    java.util.stream.IntStream.rangeClosed(i1 + 1, i1 + pointNum - 2)
+                            .map(x -> x % edges.size())
+                            .boxed()
+                            .sorted(Comparator.reverseOrder())
+                            //.peek(x -> System.out.println("remove point:" + inputToString(newEdges.get(x))))
+                            .forEach(x -> newEdges.remove((int) x));
+
+                    //newEdges.remove(i2);
+
+                    //System.out.println("remove point:" + inputToString(p2));
+                    edges = newEdges;
+                    storePoint = Math.min(i1, edges.size() - 1 );
+                    // 此处 p1 保持不变，所以 i1 不变
+                } else {
+                    // 不能则以 p2 为起始点继续执行
+                    i1++;
+                    if (i1 >= edges.size()) {
+                        i1 = 0;
+                    }
+                    // 如果再次遇到存档点，则结束处理
+                    if (i1 == storePoint) {
+                        // 环形遍历控制，第一遍只移除边上的点，第二遍简化图形
+                        break;
+                    }
+                }
+            }
+
         }
 
         private String inputToString(Input input) {
