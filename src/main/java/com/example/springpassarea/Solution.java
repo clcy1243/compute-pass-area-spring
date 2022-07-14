@@ -5,7 +5,9 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -18,8 +20,10 @@ public class Solution {
     // 精度倍数
     public static int SCALE = 100;
     public static boolean isEnableSinglePointMapMerge = true;
+    public static Map<String, Boolean> pointCheckCache = new HashMap<>();
 
     public static List<List<List<Integer>>> computePassArea(List<Input> inputs) {
+        pointCheckCache.clear();
         /*
         Compute the maximum pass area
         inputs: list of shmoo test cases, each case includes 2 input values and 1 result, e.g. [[0, 1, True], [0, 2, False]]
@@ -41,7 +45,7 @@ public class Solution {
 
         List<PassMap> passMapList = new ArrayList<>();
         for (Input input : inputs) {
-            if (input.pass) {
+            if (input.pass && matrix.getRound(input.x, input.y).stream().filter(x -> x != null).anyMatch(x -> !x.pass)) {
                 if (passMapList.isEmpty()) {
                     // new map
                     PassMap m = new PassMap(input, matrix);
@@ -52,6 +56,7 @@ public class Solution {
                         finish = m.growth();
                     } while (!finish);
 
+                    m.removePointAtLine();
                     passMapList.add(m);
 
                     continue; // todo
@@ -70,7 +75,7 @@ public class Solution {
                     do {
                         finish = m.growth();
                     } while (!finish);
-
+                    m.removePointAtLine();
                     passMapList.add(m);
                 }
             }
@@ -96,7 +101,7 @@ public class Solution {
                         continue;
                     }
                     Input fp1 = passMap.edges.get(i==0 ? passMap.edges.size() -1 : i-1);
-                    Input fp2 = passMap.edges.get(lastIndex+1);
+                    Input fp2 = passMap.edges.get(lastIndex+1 >= passMap.edges.size() ? 0: lastIndex+1);
                     Line fl1 = new Line(p1.x, p1.y, fp1.x, fp1.y);
                     Line fl2 = new Line(p1.x, p1.y, fp2.x, fp2.y);
 
@@ -686,9 +691,14 @@ public class Solution {
                 Input p1 = edges.get(i1);
                 Input p2 = edges.get(i2);
                 Input p3 = edges.get(i3);
+                String key = String.format("3-%d:%d->%d:%d->%d:%d", p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+
+                if (!pointCheckCache.containsKey(key)) {
+                    pointCheckCache.put(key, PassMap.removePointCompute3(matrix, edges, i1, i2, i3));
+                }
 
                 // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
-                boolean couldRemoveP2 = PassMap.removePointCompute3(matrix, edges, i1, i2, i3);
+                boolean couldRemoveP2 = pointCheckCache.get(key);
                 if (couldRemoveP2) {
                     // 能删除则更新存档点为p1，以 p1 为起始点再次执行
                     List<Input> newEdges = new ArrayList<>(edges);
@@ -721,8 +731,21 @@ public class Solution {
                     i1 = 0;
                 }
 
+                StringBuilder keyBuilder = new StringBuilder("5-");
+
+                for (int j = i1; j <i1+pointNum; j++) {
+                    Input p = edges.get(j%edges.size());
+                    keyBuilder.append(p.x).append(":").append(p.y).append("->");
+                }
+
+                String key = keyBuilder.toString();
+
+                if (!pointCheckCache.containsKey(key)) {
+                    pointCheckCache.put(key, PassMap.removePointComputeWithPointNum(matrix, edges, i1, pointNum));
+                }
+
                 // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
-                boolean couldRemove = PassMap.removePointComputeWithPointNum(matrix, edges, i1, pointNum);
+                boolean couldRemove = pointCheckCache.get(key);
                 if (couldRemove) {
                     // 能删除则更新存档点为p1，以 p1 为起始点再次执行
                     List<Input> newEdges = new ArrayList<>(edges);

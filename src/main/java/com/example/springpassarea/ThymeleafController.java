@@ -1,9 +1,11 @@
 package com.example.springpassarea;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import lombok.extern.slf4j.Slf4j;
 import lombok.var;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,11 +13,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 
 @Controller
+@Slf4j
 public class ThymeleafController {
-    public static List<Integer> inputFiles = IntStream.range(1, 41).boxed().collect(Collectors.toList());
+    public static List<Integer> inputFiles = IntStream.range(1, 71).boxed().collect(Collectors.toList());
 
     @GetMapping("/home")
     public ModelAndView home(@RequestParam(name = "case", required = false) Integer caseNum){
+        long startTime = System.currentTimeMillis();
         if (caseNum == null) {
             caseNum = 1;
         }
@@ -31,6 +35,7 @@ public class ThymeleafController {
         modelAndView.addObject("svg", svg);
 
         modelAndView.setViewName("home");
+        log.info("cost {}", Duration.ofMillis(System.currentTimeMillis() - startTime));
         return modelAndView;
     }
 }
