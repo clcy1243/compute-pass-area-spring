@@ -380,36 +380,40 @@ public class Solution {
             // 防止线交叉，则需要进行凹凸变化判断，暂时不能取代上面的全部边的点位变化判断
             if (p1 != p3 && inputs.indexOf(p2) != inputs.lastIndexOf(p2) && maxY - minY > 0 && maxX - minX > 0) { // 可以成为矩形
                 // 取得方向
-                int[] pp1 = new int[2];
+                Input pp1 = null;
                 //pp1.pass = true;
-                int[] pp2 = new int[2];
+                Input pp2 = null;
                 //pp2.pass = true;
                 if (p3.y > p1.y || (p3.y==p3.x && p3.x >= p1.x)) {
                     // 从下至上，从左至右的线，取 p1 -> p3 -> 右上 -> 右下 成图
-                    pp1[0] = maxX;
-                    pp1[1] = maxY;
+                    //pp1.x = maxX;
+                    //pp1.y = maxY;
+                    pp1 = matrix.get(maxX, maxY);
+                    pp2 = matrix.get(maxX, minY);
 
-                    pp2[0] = maxX;
-                    pp2[1] = minY;
+                    //pp2.x = maxX;
+                    //pp2.y = minY;
                 } else {
                     // 从上至下，从右至左的线，取 p1 -> p3 -> 左下 -> 左上 成图
-                    pp1[0] = minX;
-                    pp1[1] = minY;
+                    //pp1.x = minX;
+                    //pp1.y = minY;
+                    pp1 = matrix.get(minX, minY);
+                    pp2 = matrix.get(minX, maxY);
 
-                    pp2[0] = minX;
-                    pp2[1] = maxY;
+                    //pp2.x = minX;
+                    //pp2.y = maxY;
                 }
                 List<Line> partLines = Arrays.asList(
                         Line.createFromInput(p1, p3),
-                        new Line(p3.x, p3.y, pp1[0], pp1[1]),
-                        new Line(pp1[0], pp1[1], pp2[0], pp2[1]),
-                        new Line(pp2[0], pp2[1], p1.x, p1.y)
+                        Line.createFromInput(p3, pp1),
+                        Line.createFromInput(pp1, pp2),
+                        Line.createFromInput(pp2, p1)
                 );
                 int[][] partMap = new int[][]{
                         {p1.x*SCALE, p1.y*SCALE},
                         {p3.x*SCALE, p3.y*SCALE},
-                        {pp1[0]*SCALE, pp1[1]*SCALE},
-                        {pp2[0]*SCALE, pp2[1]*SCALE},
+                        {pp1.x*SCALE, pp1.y*SCALE},
+                        {pp2.x*SCALE, pp2.y*SCALE},
                 };
                 boolean inNewMap = linesContainsPoint(newLines, p2.x, p2.y) || Solution.pointInPolygon(newMap, new int[]{p2.x*SCALE, p2.y*SCALE});
                 boolean inNewPart = linesContainsPoint(partLines, p2.x, p2.y) || Solution.pointInPolygon(partMap, new int[]{p2.x*SCALE, p2.y*SCALE});
