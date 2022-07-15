@@ -15,7 +15,7 @@
   <!--  left -->
   <ul th:width="90">
     <li th:each="file:${inputFiles}">
-      <a th:href="@{'home?case=' + ${file}}" th:text="'case ' + ${file}"></a>
+      <a th:href="@{ ${href} + '?case=' + ${file}}" th:text="'case ' + ${file}"></a>
     </li>
   </ul>
   <!-- right -->

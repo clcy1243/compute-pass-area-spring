@@ -16,7 +16,7 @@ import java.util.Optional;
  * @author will
  * @version 1.0
  */
-public class Solution {
+public class SolutionPlanB {
     // 精度倍数
     public static int SCALE = 100;
     public static boolean isEnableSinglePointMapMerge = true;
@@ -45,153 +45,17 @@ public class Solution {
 
         List<PassMap> passMapList = new ArrayList<>();
         for (Input input : inputs) {
-            if (input.pass && matrix.getRound(input.x, input.y).stream().filter(x -> x != null).anyMatch(x -> !x.pass)) {
-                if (passMapList.isEmpty()) {
-                    // new map
-                    PassMap m = new PassMap(input, matrix);
+            if (input.pass && matrix.getRound(input.x, input.y).stream().anyMatch(x -> x == null || !x.pass)) {
 
-                    boolean finish = false;
-
-                    do {
-                        finish = m.growth();
-                    } while (!finish);
-
-                    m.removePointAtLine();
-                    passMapList.add(m);
-
-                    continue; // todo
-                }
-
-                if (passMapList.stream()
-                        .noneMatch(map -> PassMap.contains(map.edges, input))) {
-
-                //if (passMapList.isEmpty()) {
-
-                    // new map
-                    PassMap m = new PassMap(input, matrix);
-
-                    boolean finish = false;
-
-                    do {
-                        finish = m.growth();
-                    } while (!finish);
-                    m.removePointAtLine();
-                    passMapList.add(m);
-                }
+                PassMap m = new PassMap(input, matrix);
+                passMapList.add(m);
             }
         }
-        List<PassMap> newPassMapList = new ArrayList<>();
-        for (PassMap passMap : passMapList) {
-            // 分为两部，第一步去掉边上的点，第二步减少顶点
-            passMap.removePointAtLine();
-            // 减少顶点前需要判断多边形是否有完全重合的线，且连接两部分图形的，如果有则删除，此时会生成新的图
-
-            // 第一找到一个重复存在的点，且 index 差值大于2，
-            // 第二找到这个点的下一个点是否也是重复存在切index 差值大于2 的点
-            for (int i = 0; i < passMap.edges.size(); i++) {
-                int lastIndex = passMap.edges.lastIndexOf(passMap.edges.get(i));
-                if (lastIndex - i > 2 && passMap.edges.lastIndexOf(passMap.edges.get(i+1)) - i-1 > 2) {
-                    // 此线需要附加条件，
-                    //  1. 线上不能有pass点
-                    //  2. 线的两侧也应该是重合线
-                    Input p1 = passMap.edges.get(i);
-                    Input p2 = passMap.edges.get(i+1);
-                    Line line = Line.createFromInput(p1,p2);
-                    if (!line.getMiddlePoint().isEmpty()) {
-                        continue;
-                    }
-                    Input fp1 = passMap.edges.get(i==0 ? passMap.edges.size() -1 : i-1);
-                    Input fp2 = passMap.edges.get(lastIndex+1 >= passMap.edges.size() ? 0: lastIndex+1);
-                    Line fl1 = Line.createFromInput(p1,fp1);
-                    Line fl2 = Line.createFromInput(p1,fp2);
-
-                    Input bp1 = passMap.edges.get(i+2);
-                    Input bp2 = passMap.edges.get(lastIndex-2);
-                    Line bl1 = Line.createFromInput(p2,bp1);
-                    Line bl2 = Line.createFromInput(p2,bp2);
-
-
-                    if (!fl1.equals(fl2) || !bl1.equals(bl2)) {
-                        continue;
-                    }
-
-                    // 此时 要把edge 分成两个list，第一个 0-i + lastIndex+1 - size -1
-                    // 第二个 i+2 - lastIndex -1
-                    List<Input> map1 = new ArrayList<>();
-                    List<Input> map2 = new ArrayList<>();
-
-                    for (int j = 0; j < passMap.edges.size(); j++) {
-                        if (j <= i || j > lastIndex) {
-                            map1.add(passMap.edges.get(j));
-                        } else if (j >= i+1 && j < lastIndex - 1) {
-                            map2.add(passMap.edges.get(j));
-                        }
-                    }
-
-                    passMap.edges = map1;
-
-                    PassMap newPassMap = new PassMap(map2.get(0), matrix);
-                    newPassMap.edges = map2;
-
-                    newPassMapList.add(newPassMap);
-                    break; // todo 目前只做一次分割
-                }
-            }
-        }
-        passMapList.addAll(newPassMapList);
-
-        for (PassMap passMap : passMapList) {
-            // 分为两部，第一步去掉边上的点，第二步减少顶点
-            passMap.removePointCompute();
-        }
-
-
         return passMapList.stream()
-                .filter(x -> x.edges.size() > 2)
+                //.filter(x -> x.edges.size() > 2)
                 .map(x -> x.toList())
                 .collect(java.util.stream.Collectors.toList());
 
-        // 合并单点图
-
-        //List<PassMap> multiPointMap = new ArrayList<>();
-        //List<PassMap> singlePointMap = new ArrayList<>();
-        //
-        //for (PassMap passMap : passMapList) {
-        //    if (passMap.edges.size() > 1) {
-        //        multiPointMap.add(passMap);
-        //    } else {
-        //        singlePointMap.add(passMap);
-        //    }
-        //}
-        //
-        //if (isEnableSinglePointMapMerge && singlePointMap.size() > 1) {
-        //    for (int i = 0; i < singlePointMap.size() - 1; i++) {
-        //        for (int j = i + 1; j < singlePointMap.size(); j++) {
-        //            Input p1 = singlePointMap.get(i).edges.get(0);
-        //            Input p2 = singlePointMap.get(j).edges.get(0);
-        //            Line line = new Line(p1.x, p1.y, p2.x, p2.y);
-        //
-        //            if (line.getMiddlePoint().isEmpty()) {
-        //                singlePointMap.remove(j);
-        //                singlePointMap.remove(i);
-        //                i--;
-        //
-        //                PassMap newMap = new PassMap(p1, matrix);
-        //                newMap.edges.add(p2);
-        //
-        //                multiPointMap.add(newMap);
-        //                break;
-        //            }
-        //        }
-        //
-        //        if (singlePointMap.size() == 1) {
-        //            break;
-        //        }
-        //    }
-        //}
-        //
-        //return Stream.of(multiPointMap, singlePointMap).flatMap(Collection::stream)
-        //        .map(x -> x.toList()).collect(Collectors.toList());
     }
 
     /**
@@ -380,39 +244,39 @@ public class Solution {
             // 防止线交叉，则需要进行凹凸变化判断，暂时不能取代上面的全部边的点位变化判断
             if (p1 != p3 && inputs.indexOf(p2) != inputs.lastIndexOf(p2) && maxY - minY > 0 && maxX - minX > 0) { // 可以成为矩形
                 // 取得方向
-                int[] pp1 = new int[2];
-                //pp1.pass = true;
-                int[] pp2 = new int[2];
-                //pp2.pass = true;
+                Input pp1 = new Input();
+                pp1.pass = true;
+                Input pp2 = new Input();
+                pp2.pass = true;
                 if (p3.y > p1.y || (p3.y==p3.x && p3.x >= p1.x)) {
                     // 从下至上，从左至右的线，取 p1 -> p3 -> 右上 -> 右下 成图
-                    pp1[0] = maxX;
-                    pp1[1] = maxY;
+                    pp1.x = maxX;
+                    pp1.y = maxY;
 
-                    pp2[0] = maxX;
-                    pp2[1] = minY;
+                    pp2.x = maxX;
+                    pp2.y = minY;
                 } else {
                     // 从上至下，从右至左的线，取 p1 -> p3 -> 左下 -> 左上 成图
-                    pp1[0] = minX;
-                    pp1[1] = minY;
+                    pp1.x = minX;
+                    pp1.y = minY;
 
-                    pp2[0] = minX;
-                    pp2[1] = maxY;
+                    pp2.x = minX;
+                    pp2.y = maxY;
                 }
                 List<Line> partLines = Arrays.asList(
                         Line.createFromInput(p1, p3),
-                        new Line(p3.x, p3.y, pp1[0], pp1[1]),
-                        new Line(pp1[0], pp1[1], pp2[0], pp2[1]),
-                        new Line(pp2[0], pp2[1], p1.x, p1.y)
+                        Line.createFromInput(p3, pp1),
+                        Line.createFromInput(pp1, pp2),
+                        Line.createFromInput(pp2, p1)
                 );
                 int[][] partMap = new int[][]{
                         {p1.x*SCALE, p1.y*SCALE},
                         {p3.x*SCALE, p3.y*SCALE},
-                        {pp1[0]*SCALE, pp1[1]*SCALE},
-                        {pp2[0]*SCALE, pp2[1]*SCALE},
+                        {pp1.x*SCALE, pp1.y*SCALE},
+                        {pp2.x*SCALE, pp2.y*SCALE},
                 };
-                boolean inNewMap = linesContainsPoint(newLines, p2.x, p2.y) || Solution.pointInPolygon(newMap, new int[]{p2.x*SCALE, p2.y*SCALE});
-                boolean inNewPart = linesContainsPoint(partLines, p2.x, p2.y) || Solution.pointInPolygon(partMap, new int[]{p2.x*SCALE, p2.y*SCALE});
+                boolean inNewMap = linesContainsPoint(newLines, p2.x, p2.y) || SolutionPlanB.pointInPolygon(newMap, new int[]{p2.x*SCALE, p2.y*SCALE});
+                boolean inNewPart = linesContainsPoint(partLines, p2.x, p2.y) || SolutionPlanB.pointInPolygon(partMap, new int[]{p2.x*SCALE, p2.y*SCALE});
                 // 如 inNewPart 为 false， 说明是凹进去的
                 // 此时 inNewMap 为 true 的可能会造成交叉，应阻止此次变化
                 if (!inNewPart && inNewMap) {
@@ -434,8 +298,8 @@ public class Solution {
                 }
                 // 3.2
                 boolean isPass = mPoint.pass;
-                boolean inOld = linesContainsPoint(oldLines, point[0], point[1]) || Solution.pointInPolygon(oldMap, cPoint);
-                boolean inNew = linesContainsPoint(newLines, point[0], point[1]) || Solution.pointInPolygon(newMap, cPoint);
+                boolean inOld = linesContainsPoint(oldLines, point[0], point[1]) || SolutionPlanB.pointInPolygon(oldMap, cPoint);
+                boolean inNew = linesContainsPoint(newLines, point[0], point[1]) || SolutionPlanB.pointInPolygon(newMap, cPoint);
                 if (isPass && inOld) { // 是pass 点且在图内
                     inOldPass++;
                 } else if (isPass && !inOld) { // 是pass 点且不在图内
@@ -558,8 +422,8 @@ public class Solution {
                 }
                 // 3.2
                 boolean isPass = mPoint.pass;
-                boolean inOld = linesContainsPoint(oldLines, point[0], point[1]) || Solution.pointInPolygon(oldMap, cPoint);
-                boolean inNew = linesContainsPoint(newLines, point[0], point[1]) || Solution.pointInPolygon(newMap, cPoint);
+                boolean inOld = linesContainsPoint(oldLines, point[0], point[1]) || SolutionPlanB.pointInPolygon(oldMap, cPoint);
+                boolean inNew = linesContainsPoint(newLines, point[0], point[1]) || SolutionPlanB.pointInPolygon(newMap, cPoint);
                 if (isPass && inOld) { // 是pass 点且在图内
                     inOldPass++;
                 } else if (isPass && !inOld) { // 是pass 点且不在图内

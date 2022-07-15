@@ -17,7 +17,7 @@ import org.springframework.web.servlet.ModelAndView;
 public class ThymeleafController {
     public static List<Integer> inputFiles = IntStream.range(1, 71).boxed().collect(Collectors.toList());
 
-    @GetMapping("/home")
+    @GetMapping({"/home", "/"})
     public ModelAndView home(@RequestParam(name = "case", required = false) Integer caseNum){
         long startTime = System.currentTimeMillis();
         if (caseNum == null) {
@@ -33,6 +33,31 @@ public class ThymeleafController {
         var svg = Draw.toSvg(inputs, lines);
 
         modelAndView.addObject("svg", svg);
+        modelAndView.addObject("href", "home");
+
+        modelAndView.setViewName("home");
+        log.info("cost {}", Duration.ofMillis(System.currentTimeMillis() - startTime));
+        return modelAndView;
+    }
+
+
+    @GetMapping("/planb")
+    public ModelAndView planb(@RequestParam(name = "case", required = false) Integer caseNum){
+        long startTime = System.currentTimeMillis();
+        if (caseNum == null) {
+            caseNum = 1;
+        }
+
+        ModelAndView modelAndView = new ModelAndView();
+        modelAndView.addObject("inputFiles", inputFiles);
+
+        String path = "cases/" + caseNum + ".in";
+        var inputs = InputReader.readFromFile(path);
+        var lines = SolutionPlanB.computePassArea(inputs);
+        var svg = Draw.toSvg(inputs, lines);
+
+        modelAndView.addObject("svg", svg);
+        modelAndView.addObject("href", "planb");
 
         modelAndView.setViewName("home");
         log.info("cost {}", Duration.ofMillis(System.currentTimeMillis() - startTime));
