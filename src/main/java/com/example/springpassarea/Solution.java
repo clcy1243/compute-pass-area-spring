@@ -96,19 +96,19 @@ public class Solution {
                     //  2. 线的两侧也应该是重合线
                     Input p1 = passMap.edges.get(i);
                     Input p2 = passMap.edges.get(i+1);
-                    Line line = new Line(p1.x, p1.y, p2.x, p2.y);
+                    Line line = Line.createFromInput(p1,p2);
                     if (!line.getMiddlePoint().isEmpty()) {
                         continue;
                     }
                     Input fp1 = passMap.edges.get(i==0 ? passMap.edges.size() -1 : i-1);
                     Input fp2 = passMap.edges.get(lastIndex+1 >= passMap.edges.size() ? 0: lastIndex+1);
-                    Line fl1 = new Line(p1.x, p1.y, fp1.x, fp1.y);
-                    Line fl2 = new Line(p1.x, p1.y, fp2.x, fp2.y);
+                    Line fl1 = Line.createFromInput(p1,fp1);
+                    Line fl2 = Line.createFromInput(p1,fp2);
 
                     Input bp1 = passMap.edges.get(i+2);
                     Input bp2 = passMap.edges.get(lastIndex-2);
-                    Line bl1 = new Line(p2.x, p2.y, bp1.x, bp1.y);
-                    Line bl2 = new Line(p2.x, p2.y, bp2.x, bp2.y);
+                    Line bl1 = Line.createFromInput(p2,bp1);
+                    Line bl2 = Line.createFromInput(p2,bp2);
 
 
                     if (!fl1.equals(fl2) || !bl1.equals(bl2)) {
@@ -304,7 +304,7 @@ public class Solution {
                 }
                 Input p1 = inputs.get(i);
                 Input p2 = inputs.get(j);
-                Line line = new Line(p1.x, p1.y, p2.x, p2.y);
+                Line line = Line.createFromInput(p1,p2);
                 if (line.contains(point.x, point.y)) {
                     return true;
                 }
@@ -353,7 +353,7 @@ public class Solution {
                 }
                 Input pa = inputs.get(i);
                 Input pb = inputs.get(j);
-                Line line = new Line(pa.x, pa.y, pb.x, pb.y);
+                Line line = Line.createFromInput(pa, pb);
                 oldLines.add(line);
             }
 
@@ -373,8 +373,51 @@ public class Solution {
                 }
                 Input pa = newInputs.get(i);
                 Input pb = newInputs.get(j);
-                Line line = new Line(pa.x, pa.y, pb.x, pb.y);
+                Line line = Line.createFromInput(pa, pb);
                 newLines.add(line);
+            }
+
+            // 防止线交叉，则需要进行凹凸变化判断，暂时不能取代上面的全部边的点位变化判断
+            if (p1 != p3 && inputs.indexOf(p2) != inputs.lastIndexOf(p2) && maxY - minY > 0 && maxX - minX > 0) { // 可以成为矩形
+                // 取得方向
+                Input pp1 = new Input();
+                pp1.pass = true;
+                Input pp2 = new Input();
+                pp2.pass = true;
+                if (p3.y > p1.y || (p3.y==p3.x && p3.x >= p1.x)) {
+                    // 从下至上，从左至右的线，取 p1 -> p3 -> 右上 -> 右下 成图
+                    pp1.x = maxX;
+                    pp1.y = maxY;
+
+                    pp2.x = maxX;
+                    pp2.y = minY;
+                } else {
+                    // 从上至下，从右至左的线，取 p1 -> p3 -> 左下 -> 左上 成图
+                    pp1.x = minX;
+                    pp1.y = minY;
+
+                    pp2.x = minX;
+                    pp2.y = maxY;
+                }
+                List<Line> partLines = Arrays.asList(
+                        Line.createFromInput(p1, p3),
+                        Line.createFromInput(p3, pp1),
+                        Line.createFromInput(pp1, pp2),
+                        Line.createFromInput(pp2, p1)
+                );
+                int[][] partMap = new int[][]{
+                        {p1.x*SCALE, p1.y*SCALE},
+                        {p3.x*SCALE, p3.y*SCALE},
+                        {pp1.x*SCALE, pp1.y*SCALE},
+                        {pp2.x*SCALE, pp2.y*SCALE},
+                };
+                boolean inNewMap = linesContainsPoint(newLines, p2.x, p2.y) || Solution.pointInPolygon(newMap, new int[]{p2.x*SCALE, p2.y*SCALE});
+                boolean inNewPart = linesContainsPoint(partLines, p2.x, p2.y) || Solution.pointInPolygon(partMap, new int[]{p2.x*SCALE, p2.y*SCALE});
+                // 如 inNewPart 为 false， 说明是凹进去的
+                // 此时 inNewMap 为 true 的可能会造成交叉，应阻止此次变化
+                if (!inNewPart && inNewMap) {
+                    return false;
+                }
             }
 
             // 3. 分别在保留 p2 和 去掉 p2 的情况下进行点是否在图内的遍历
@@ -414,7 +457,7 @@ public class Solution {
                 }
             }
             // 4. 新旧包含点位对比
-            int addScore = p1==p3 ?  6 : 3 // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
+            int addScore = (p1==p3 ?  6 : 3) // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
                     + (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
                     + (inNewPass - inOldPass) * 5; // 多的pass点的分数
             return addScore>=0;
@@ -472,7 +515,7 @@ public class Solution {
                 }
                 Input pa = inputs.get(i);
                 Input pb = inputs.get(j);
-                Line line = new Line(pa.x, pa.y, pb.x, pb.y);
+                Line line = Line.createFromInput(pa, pb);
                 oldLines.add(line);
             }
 
@@ -497,7 +540,7 @@ public class Solution {
                 }
                 Input pa = newInputs.get(i);
                 Input pb = newInputs.get(j);
-                Line line = new Line(pa.x, pa.y, pb.x, pb.y);
+                Line line = Line.createFromInput(pa, pb);
                 newLines.add(line);
             }
 
@@ -539,7 +582,7 @@ public class Solution {
             }
 
             // 4. 新旧包含点位对比
-            int addScore =p1.equals(inputs.get((currentIndex+pointNum -1) % inputs.size())) ? (pointNum - 1) * 3 : (pointNum - 2) * 3 // 一条边的分数, 假设 p1 p2 相同，实际上会少两条边
+            int addScore =(p1.equals(inputs.get((currentIndex+pointNum -1) % inputs.size())) ? (pointNum - 1) * 3 : (pointNum - 2) * 3) // 一条边的分数, 假设 p1 p2 相同，实际上会少两条边
                     + (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
                     + (inNewPass - inOldPass) * 5; // 多的pass点的分数
             return addScore>=0;
@@ -642,7 +685,7 @@ public class Solution {
 
                 // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
                 boolean couldRemoveP2 = false;
-                Line line = new Line(p1.x, p1.y, p3.x, p3.y);
+                Line line = Line.createFromInput(p1, p3);
                 couldRemoveP2 = line.contains(p2.x, p2.y);
                 if (couldRemoveP2) {
                     // 能删除则更新存档点为p1，以 p1 为起始点再次执行
@@ -803,7 +846,7 @@ public class Solution {
         private final int x2;
         private final int y2;
 
-        private final boolean vector;
+        public final boolean vector;
         private BigDecimal n; // 斜率
         private BigDecimal c; // 偏移量
 
@@ -818,6 +861,10 @@ public class Solution {
             } else {
                 vector = x1 > x2;
             }
+        }
+
+        public static Line createFromInput(Input p1, Input p2) {
+            return new Line(p1.x, p1.y, p2.x, p2.y);
         }
 
         public boolean contains(int x, int y) {

@@ -3,6 +3,7 @@ package com.example.springpassarea;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.example.springpassarea.Solution.Line;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.Test;
  * @version 1.0
  */
 class SolutionTest {
+
+    Logger log = Logger.getLogger(SolutionTest.class.getName());
 
     @Test
     void lineEquals() {
@@ -34,6 +37,33 @@ class SolutionTest {
         line2 = new Line(0, 4, 0, 5);
 
         assertTrue(line1.equals(line2));
+    }
+
+
+    @Test
+    void lineVector() {
+        Line l1 = new Line(0, 0, 1, 1); // 0 - 90˚
+        Line l2 = new Line(0, 0, -1, 1); // 90 - 180˚
+        Line l3 = new Line(0, 0, 1, -1); // -0 - -90˚
+        Line l4 = new Line(0, 0, -1, -1); // -0 - -180˚
+        log.info("l1 N:" + l1.getN() + " C:" + l1.getC() + " V:"+ l1.vector); // n > 0 v = false
+        log.info("l2 N:" + l2.getN() + " C:" + l2.getC() + " V:"+ l2.vector); // n < 0 v = true
+        log.info("l3 N:" + l3.getN() + " C:" + l3.getC() + " V:"+ l3.vector); // n < 0 v = false
+        log.info("l4 N:" + l4.getN() + " C:" + l4.getC() + " V:"+ l4.vector); // n > 0 v = true
+    }
+
+    @Test
+    void score() {
+        Input p1 = new Input();
+        Input p3 = p1;
+        int inNewFail = 0;
+        int inOldFail = 0;
+        int inNewPass = 1;
+        int inOldPass = 5;
+        int addScore = (p1==p3 ?  6 : 3 // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
+                + ( (inNewFail - inOldFail) * -10) // 多的 fail 点的分数
+                + ( (inNewPass - inOldPass) * 5));
+        assertEquals(-14, addScore);
     }
 
     @Test
