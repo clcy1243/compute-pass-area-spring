@@ -3,6 +3,8 @@ package com.example.springpassarea;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.example.springpassarea.Solution.Line;
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 
@@ -50,6 +52,17 @@ class SolutionTest {
         log.info("l2 N:" + l2.getN() + " C:" + l2.getC() + " V:"+ l2.vector); // n < 0 v = true
         log.info("l3 N:" + l3.getN() + " C:" + l3.getC() + " V:"+ l3.vector); // n < 0 v = false
         log.info("l4 N:" + l4.getN() + " C:" + l4.getC() + " V:"+ l4.vector); // n > 0 v = true
+    }
+
+    @Test
+    void lineHasCross() {
+        Line l1 = new Line(67, 103, 85, 135);
+        Line l2 = new Line(85, 135, 81, 127);
+        Line l3 = new Line(81, 127, 79, 128);
+        Line l4 = new Line(79, 128, 67, 103);
+
+        boolean a = Line.hasCross(Arrays.asList(l1, l2, l3, l4));
+        assertTrue(a);
     }
 
     @Test

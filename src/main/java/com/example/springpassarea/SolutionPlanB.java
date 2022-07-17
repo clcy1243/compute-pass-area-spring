@@ -832,4 +832,32 @@ public class SolutionPlanB {
                     '}';
         }
     }
+
+    public static class Edge {
+        private Input point;
+        private Matrix matrix;
+
+        public Edge(Input point, Matrix matrix) {
+            this.point = point;
+            List<Input> around = matrix.getRound(point.x, point.y);
+            /*
+            list.add(get(x - 1, y)); // <
+            list.add(get(x - 1, y + 1)); // <^
+            list.add(get(x, y + 1)); // ^
+            list.add(get(x + 1, y + 1)); // ^>
+            list.add(get(x + 1, y)); // >
+            list.add(get(x + 1, y - 1)); // v>
+            list.add(get(x, y - 1)); // v
+            list.add(get(x - 1, y - 1)); // <v
+             */
+            boolean left = Optional.ofNullable(around.get(0)).map(x -> x.pass).orElse(false);
+            boolean leftUp = Optional.ofNullable(around.get(1)).map(x -> x.pass).orElse(false);
+            boolean up = Optional.ofNullable(around.get(2)).map(x -> x.pass).orElse(false);
+            boolean rightUp = Optional.ofNullable(around.get(3)).map(x -> x.pass).orElse(false);
+            boolean right = Optional.ofNullable(around.get(4)).map(x -> x.pass).orElse(false);
+            boolean rightDown = Optional.ofNullable(around.get(5)).map(x -> x.pass).orElse(false);
+            boolean down = Optional.ofNullable(around.get(6)).map(x -> x.pass).orElse(false);
+            boolean leftDown = Optional.ofNullable(around.get(7)).map(x -> x.pass).orElse(false);
+        }
+    }
 }

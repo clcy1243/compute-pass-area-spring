@@ -80,10 +80,14 @@ public class Solution {
                 }
             }
         }
-        List<PassMap> newPassMapList = new ArrayList<>();
         for (PassMap passMap : passMapList) {
             // 分为两部，第一步去掉边上的点，第二步减少顶点
             passMap.removePointAtLine();
+            passMap.removePointCompute();
+        }
+        List<PassMap> newPassMapList = new ArrayList<>();
+        for (PassMap passMap : passMapList) {
+            // 分为两部，第一步去掉边上的点，第二步减少顶点
             // 减少顶点前需要判断多边形是否有完全重合的线，且连接两部分图形的，如果有则删除，此时会生成新的图
 
             // 第一找到一个重复存在的点，且 index 差值大于2，
@@ -94,26 +98,26 @@ public class Solution {
                     // 此线需要附加条件，
                     //  1. 线上不能有pass点
                     //  2. 线的两侧也应该是重合线
-                    Input p1 = passMap.edges.get(i);
-                    Input p2 = passMap.edges.get(i+1);
-                    Line line = Line.createFromInput(p1,p2);
-                    if (!line.getMiddlePoint().isEmpty()) {
-                        continue;
-                    }
-                    Input fp1 = passMap.edges.get(i==0 ? passMap.edges.size() -1 : i-1);
-                    Input fp2 = passMap.edges.get(lastIndex+1 >= passMap.edges.size() ? 0: lastIndex+1);
-                    Line fl1 = Line.createFromInput(p1,fp1);
-                    Line fl2 = Line.createFromInput(p1,fp2);
-
-                    Input bp1 = passMap.edges.get(i+2);
-                    Input bp2 = passMap.edges.get(lastIndex-2);
-                    Line bl1 = Line.createFromInput(p2,bp1);
-                    Line bl2 = Line.createFromInput(p2,bp2);
-
-
-                    if (!fl1.equals(fl2) || !bl1.equals(bl2)) {
-                        continue;
-                    }
+                    //Input p1 = passMap.edges.get(i);
+                    //Input p2 = passMap.edges.get(i+1);
+                    //Line line = Line.createFromInput(p1,p2);
+                    //if (!line.getMiddlePoint().isEmpty()) {
+                    //    continue;
+                    //}
+                    //Input fp1 = passMap.edges.get(i==0 ? passMap.edges.size() -1 : i-1);
+                    //Input fp2 = passMap.edges.get(lastIndex+1 >= passMap.edges.size() ? 0: lastIndex+1);
+                    //Line fl1 = Line.createFromInput(p1,fp1);
+                    //Line fl2 = Line.createFromInput(p1,fp2);
+                    //
+                    //Input bp1 = passMap.edges.get(i+2);
+                    //Input bp2 = passMap.edges.get(lastIndex-2);
+                    //Line bl1 = Line.createFromInput(p2,bp1);
+                    //Line bl2 = Line.createFromInput(p2,bp2);
+                    //
+                    //
+                    //if (!fl1.equals(fl2) || !bl1.equals(bl2)) {
+                    //    continue;
+                    //}
 
                     // 此时 要把edge 分成两个list，第一个 0-i + lastIndex+1 - size -1
                     // 第二个 i+2 - lastIndex -1
@@ -140,11 +144,24 @@ public class Solution {
         }
         passMapList.addAll(newPassMapList);
 
-        for (PassMap passMap : passMapList) {
-            // 分为两部，第一步去掉边上的点，第二步减少顶点
-            passMap.removePointCompute();
+        for (int i = 0; i < newPassMapList.size(); i++) {
+            PassMap passMap = newPassMapList.get(i);
+            for (int j = 0; j < passMapList.size(); j++) {
+                PassMap map = passMapList.get(j);
+                if (map.equals(passMap)) {
+                    break;
+                }
+                int count = 0;
+                for (Input p : passMap.edges) {
+                    if (PassMap.contains(map.edges, p)) {
+                        count++;
+                    }
+                }
+                if (count > passMap.edges.size() / 2) {
+                    passMapList.remove(passMap);
+                }
+            }
         }
-
 
         return passMapList.stream()
                 .filter(x -> x.edges.size() > 2)
@@ -461,9 +478,10 @@ public class Solution {
                 }
             }
             // 4. 新旧包含点位对比
-            int addScore = (p1==p3 ?  6 : 3) // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
-                    + (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
-                    + (inNewPass - inOldPass) * 5; // 多的pass点的分数
+            int addScore = computeAddScore(p1==p3 ?  -2 : -1, inNewFail - inOldFail, inNewPass - inOldPass);
+                    //(p1==p3 ?  6 : 3) // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
+                    //+ (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
+                    //+ (inNewPass - inOldPass) * 5; // 多的pass点的分数
             return addScore>=0;
             //if (inNewPass < inOldPass) {
             //    return false;
@@ -474,6 +492,339 @@ public class Solution {
             //return true;
         }
 
+        // 顺时针增点
+        public static boolean extendLineCompute(Matrix matrix, List<Input> inputs, int currentIndex) {
+            Input p1 = inputs.get(currentIndex);
+            Input p2 = inputs.get((currentIndex+1)%inputs.size());
+            Input p3 = inputs.get((currentIndex+2)%inputs.size());
+            Line currentLine = Line.createFromInput(p1, p2);
+            int[] nextPoint = currentLine.getNextPoint(matrix.maxX);
+            if (nextPoint[0] < 0) {
+                return false;
+            }
+
+            Input po = matrix.get(nextPoint[0], nextPoint[1]);
+            if (po == null || !po.pass) {
+                return false;
+            }
+
+            // 1. 以 p1 p2 p3 三点所占用的空间，得到一个矩形，
+            int minX = po.x;
+            int minY = po.y;
+            int maxX = po.x;
+            int maxY = po.y;
+
+            for (Input p : inputs) {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            }
+
+            // 2.1 拿到矩形内所有的点
+            List<int[]> points = new ArrayList<>();
+            for (int m = minX; m <= maxX; m++) {
+                for (int n = minY; n <= maxY; n++) {
+                    points.add(new int[]{m,n});
+                }
+            }
+
+            // po 是仅替换掉 p2 还是同时替换掉 p3，需要同时计算三个图形
+            // case 1 p1 -> p2 -> p3
+            // case 2 p1 -> po -> p3
+            // case 3 p1 -> po
+
+            // 2.2 构建新旧图，由于精度问题，在边上的点和在图内的点需要分别计算
+            // case 1 p1 -> p2 -> p3
+            int[][] oldMap = inputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[inputs.size()][]);
+            List<Line> oldLines = new ArrayList<>();
+            for (int i = 0; i < inputs.size(); i++) {
+                int j = i+1;
+                if (j == inputs.size()) {
+                    j = 0;
+                }
+                Input pa = inputs.get(i);
+                Input pb = inputs.get(j);
+                Line line = Line.createFromInput(pa, pb);
+                oldLines.add(line);
+            }
+
+            List<Input> newInputs = new ArrayList<>(inputs);
+
+            // case 2 p1 -> po -> p3
+            newInputs.set((currentIndex+1)%inputs.size(), po);
+
+            int[][] newMap = newInputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[newInputs.size()][]);
+
+            List<Line> newLines = new ArrayList<>();
+            for (int i = 0; i < newInputs.size(); i++) {
+                int j = i+1;
+                if (j == newInputs.size()) {
+                    j = 0;
+                }
+                Input pa = newInputs.get(i);
+                Input pb = newInputs.get(j);
+                Line line = Line.createFromInput(pa, pb);
+                newLines.add(line);
+            }
+
+            // case 2 p1 -> po
+            newInputs.remove((currentIndex+2)%inputs.size());
+            int[][] newMapWithoutP3 = newInputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[newInputs.size()][]);
+
+            List<Line> newLinesWithoutP3 = new ArrayList<>();
+            for (int i = 0; i < newInputs.size(); i++) {
+                int j = i+1;
+                if (j == newInputs.size()) {
+                    j = 0;
+                }
+                Input pa = newInputs.get(i);
+                Input pb = newInputs.get(j);
+                Line line = Line.createFromInput(pa, pb);
+                newLinesWithoutP3.add(line);
+            }
+
+            boolean isNewHasCross = Line.hasCross(newLines);
+            boolean isNewWithoutP3HasCross = Line.hasCross(newLinesWithoutP3);
+
+            // 3. 分别在保留 p2 和 去掉 p2 的情况下进行点是否在图内的遍历
+            int inOldPass = 0;
+            int inOldFail = 0;
+            int inNewPass = 0;
+            int inNewFail = 0;
+            int inNewPassWithoutP3 = 0;
+            int inNewFailWithoutP3 = 0;
+            for (int[] point : points) {
+                // 3.1 如果点在矩阵中不存在，则不计算
+                Input mPoint = matrix.get(point[0], point[1]);
+                int[] cPoint = new int[]{point[0]*SCALE, point[1]*SCALE};
+                if (mPoint == null) {
+                    continue;
+                }
+                // 3.2
+                boolean isPass = mPoint.pass;
+                boolean inOld = linesContainsPoint(oldLines, point[0], point[1]) || Solution.pointInPolygon(oldMap, cPoint);
+                boolean inNew = !isNewHasCross && (linesContainsPoint(newLines, point[0], point[1]) || Solution.pointInPolygon(newMap, cPoint));
+                boolean inNewWithoutP3 = !isNewWithoutP3HasCross && (linesContainsPoint(newLinesWithoutP3, point[0], point[1]) || Solution.pointInPolygon(newMapWithoutP3, cPoint));
+
+                if (isPass) {
+                    if (inOld) {
+                        inOldPass++;
+                    }
+                    if (inNew) {
+                        inNewPass++;
+                    }
+                    if (inNewWithoutP3) {
+                        inNewPassWithoutP3++;
+                    }
+                } else {
+                    if (inOld) {
+                        inOldFail++;
+                    }
+                    if (inNew) {
+                        inNewFail++;
+                    }
+                    if (inNewWithoutP3) {
+                        inNewFailWithoutP3++;
+                    }
+                }
+            }
+
+            int addScore = computeAddScore(0, inNewFail - inOldFail, inNewPass - inOldPass);
+            int addScoreWithoutP3 = computeAddScore(-1, inNewFailWithoutP3 - inOldFail, inNewPassWithoutP3 - inOldPass);
+
+            if (addScoreWithoutP3 >= 0 && addScoreWithoutP3 >= addScore) {
+                // case 3 p1 -> po
+                inputs.set((currentIndex+1)%inputs.size(), po);
+                inputs.remove((currentIndex+2)%inputs.size());
+                return true;
+            } else if (addScore >= 0) {
+                // case 2 p1 -> po -> p3
+                inputs.set((currentIndex+1)%inputs.size(), po);
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        // 逆时针增点
+        public static boolean extendLineComputeRes(Matrix matrix, List<Input> inputs, int currentIndex) {
+            Input p1 = inputs.get(currentIndex);
+            int p2Index = (currentIndex-1 + inputs.size())%inputs.size();
+            int p3Index = (currentIndex-2 + inputs.size())%inputs.size();
+            Input p2 = inputs.get(p2Index);
+            Input p3 = inputs.get(p3Index);
+            Line currentLine = Line.createFromInput(p1, p2);
+            int[] nextPoint = currentLine.getNextPoint(matrix.maxX);
+            if (nextPoint[0] < 0) {
+                return false;
+            }
+
+            Input po = matrix.get(nextPoint[0], nextPoint[1]);
+            if (po == null || !po.pass) {
+                return false;
+            }
+
+            // 1. 以 p1 p2 p3 三点所占用的空间，得到一个矩形，
+            int minX = po.x;
+            int minY = po.y;
+            int maxX = po.x;
+            int maxY = po.y;
+
+            for (Input p : inputs) {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            }
+
+            // 2.1 拿到矩形内所有的点
+            List<int[]> points = new ArrayList<>();
+            for (int m = minX; m <= maxX; m++) {
+                for (int n = minY; n <= maxY; n++) {
+                    points.add(new int[]{m,n});
+                }
+            }
+
+            // po 是仅替换掉 p2 还是同时替换掉 p3，需要同时计算三个图形
+            // case 1 p1 -> p2 -> p3
+            // case 2 p1 -> po -> p3
+            // case 3 p1 -> po
+
+            // 2.2 构建新旧图，由于精度问题，在边上的点和在图内的点需要分别计算
+            // case 1 p1 -> p2 -> p3
+            int[][] oldMap = inputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[inputs.size()][]);
+            List<Line> oldLines = new ArrayList<>();
+            for (int i = 0; i < inputs.size(); i++) {
+                int j = i+1;
+                if (j == inputs.size()) {
+                    j = 0;
+                }
+                Input pa = inputs.get(i);
+                Input pb = inputs.get(j);
+                Line line = Line.createFromInput(pa, pb);
+                oldLines.add(line);
+            }
+
+            List<Input> newInputs = new ArrayList<>(inputs);
+
+            // case 2 p1 -> po -> p3
+            newInputs.set(p2Index, po);
+
+            int[][] newMap = newInputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[newInputs.size()][]);
+
+            List<Line> newLines = new ArrayList<>();
+            for (int i = 0; i < newInputs.size(); i++) {
+                int j = i+1;
+                if (j == newInputs.size()) {
+                    j = 0;
+                }
+                Input pa = newInputs.get(i);
+                Input pb = newInputs.get(j);
+                Line line = Line.createFromInput(pa, pb);
+                newLines.add(line);
+            }
+
+            // case 2 p1 -> po
+            newInputs.remove(p3Index);
+            int[][] newMapWithoutP3 = newInputs.stream()
+                    .map(i -> new int[]{i.x*SCALE, i.y*SCALE})
+                    .collect(java.util.stream.Collectors.toList())
+                    .toArray(new int[newInputs.size()][]);
+
+            List<Line> newLinesWithoutP3 = new ArrayList<>();
+            for (int i = 0; i < newInputs.size(); i++) {
+                int j = i+1;
+                if (j == newInputs.size()) {
+                    j = 0;
+                }
+                Input pa = newInputs.get(i);
+                Input pb = newInputs.get(j);
+                Line line = Line.createFromInput(pa, pb);
+                newLinesWithoutP3.add(line);
+            }
+
+            boolean isNewHasCross = Line.hasCross(newLines);
+            boolean isNewWithoutP3HasCross = Line.hasCross(newLinesWithoutP3);
+
+            // 3. 分别在保留 p2 和 去掉 p2 的情况下进行点是否在图内的遍历
+            int inOldPass = 0;
+            int inOldFail = 0;
+            int inNewPass = 0;
+            int inNewFail = 0;
+            int inNewPassWithoutP3 = 0;
+            int inNewFailWithoutP3 = 0;
+            for (int[] point : points) {
+                // 3.1 如果点在矩阵中不存在，则不计算
+                Input mPoint = matrix.get(point[0], point[1]);
+                int[] cPoint = new int[]{point[0]*SCALE, point[1]*SCALE};
+                if (mPoint == null) {
+                    continue;
+                }
+                // 3.2
+                boolean isPass = mPoint.pass;
+                boolean inOld = linesContainsPoint(oldLines, point[0], point[1]) || Solution.pointInPolygon(oldMap, cPoint);
+                boolean inNew = !isNewHasCross && (linesContainsPoint(newLines, point[0], point[1]) || Solution.pointInPolygon(newMap, cPoint));
+                boolean inNewWithoutP3 = !isNewWithoutP3HasCross && (linesContainsPoint(newLinesWithoutP3, point[0], point[1]) || Solution.pointInPolygon(newMapWithoutP3, cPoint));
+
+                if (isPass) {
+                    if (inOld) {
+                        inOldPass++;
+                    }
+                    if (inNew) {
+                        inNewPass++;
+                    }
+                    if (inNewWithoutP3) {
+                        inNewPassWithoutP3++;
+                    }
+                } else {
+                    if (inOld) {
+                        inOldFail++;
+                    }
+                    if (inNew) {
+                        inNewFail++;
+                    }
+                    if (inNewWithoutP3) {
+                        inNewFailWithoutP3++;
+                    }
+                }
+            }
+
+            int addScore = computeAddScore(0, inNewFail - inOldFail, inNewPass - inOldPass);
+            int addScoreWithoutP3 = computeAddScore(-1, inNewFailWithoutP3 - inOldFail, inNewPassWithoutP3 - inOldPass);
+
+            if (addScoreWithoutP3 >= 0 && addScoreWithoutP3 >= addScore) {
+                // case 3 p1 -> po
+                inputs.set(p2Index, po);
+                inputs.remove(p3Index);
+                return true;
+            } else if (addScore >= 0) {
+                // case 2 p1 -> po -> p3
+                inputs.set(p2Index, po);
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        public static int computeAddScore(int addEdgeNum, int addFailNum, int addPassNum) {
+            return addEdgeNum * -3 + addFailNum * -10 + addPassNum * 5;
+        }
 
         public static boolean removePointComputeWithPointNum(Matrix matrix, List<Input> inputs, int currentIndex, int pointNum) {
             if (pointNum < 3 || inputs.size() <= pointNum) {
@@ -586,9 +937,10 @@ public class Solution {
             }
 
             // 4. 新旧包含点位对比
-            int addScore =(p1.equals(inputs.get((currentIndex+pointNum -1) % inputs.size())) ? (pointNum - 1) * 3 : (pointNum - 2) * 3) // 一条边的分数, 假设 p1 p2 相同，实际上会少两条边
-                    + (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
-                    + (inNewPass - inOldPass) * 5; // 多的pass点的分数
+            int addScore = computeAddScore((p1.equals(inputs.get((currentIndex+pointNum -1) % inputs.size())) ? 1 - pointNum : 2 - pointNum), inNewFail - inOldFail, inNewPass - inOldPass);
+                    //(p1.equals(inputs.get((currentIndex+pointNum -1) % inputs.size())) ? (pointNum - 1) * 3 : (pointNum - 2) * 3) // 一条边的分数, 假设 p1 p2 相同，实际上会少两条边
+                    //+ (inNewFail - inOldFail) * -10 // 多的 fail 点的分数
+                    //+ (inNewPass - inOldPass) * 5; // 多的pass点的分数
             return addScore>=0;
         }
 
@@ -769,6 +1121,127 @@ public class Solution {
                 }
             }
 
+            // todo p1-p2 延长到下一个点后，是否能够使得分更高
+            storePoint = 0;
+            i1 = 0;
+            while (edges.size() > 4) {
+                if (i1 >= edges.size()) {
+                    i1 = 0;
+                }
+
+                Input p1 = edges.get(i1);
+                Input p2 = edges.get((i1+1)%edges.size());
+                Input p3 = edges.get((i1+2)%edges.size());
+                String key = String.format("a-3-%d:%d->%d:%d->%d:%d", p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+
+                if (!pointCheckCache.containsKey(key)) {
+                    pointCheckCache.put(key, PassMap.extendLineCompute(matrix, edges, i1));
+                }
+
+                boolean couldRemove = pointCheckCache.get(key);
+                if (couldRemove) {
+                    storePoint = Math.min(i1, edges.size() - 1 );
+                    // 此处 p1 保持不变，所以 i1 不变
+                } else {
+                    // 不能则以 p2 为起始点继续执行
+                    i1++;
+                    if (i1 >= edges.size()) {
+                        i1 = 0;
+                    }
+                    // 如果再次遇到存档点，则结束处理
+                    if (i1 == storePoint) {
+                        // 环形遍历控制，第一遍只移除边上的点，第二遍简化图形
+                        break;
+                    }
+                }
+            }
+            // todo p1-p2 延长到下一个点后，是否能够使得分更高
+            storePoint = 0;
+            i1 = 0;
+            while (edges.size() > 4) {
+                if (i1 >= edges.size()) {
+                    i1 = 0;
+                }
+
+                Input p1 = edges.get(i1);
+                Input p2 = edges.get((i1-1 + edges.size())%edges.size());
+                Input p3 = edges.get((i1-2 + edges.size())%edges.size());
+                String key = String.format("a-3-%d:%d->%d:%d->%d:%d", p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+
+                if (!pointCheckCache.containsKey(key)) {
+                    pointCheckCache.put(key, PassMap.extendLineComputeRes(matrix, edges, i1));
+                }
+
+                boolean couldRemove = pointCheckCache.get(key);
+                if (couldRemove) {
+                    storePoint = Math.min(i1, edges.size() - 1 );
+                    // 此处 p1 保持不变，所以 i1 不变
+                } else {
+                    // 不能则以 p2 为起始点继续执行
+                    i1++;
+                    if (i1 >= edges.size()) {
+                        i1 = 0;
+                    }
+                    // 如果再次遇到存档点，则结束处理
+                    if (i1 == storePoint) {
+                        // 环形遍历控制，第一遍只移除边上的点，第二遍简化图形
+                        break;
+                    }
+                }
+            }
+
+
+            // 做延长线之后，要再次进行三点优化
+            storePoint = 0;
+            i1 = 0;
+            while (edges.size() > 2) {
+                if (i1 >= edges.size()) {
+                    i1 = 0;
+                }
+                // 取临近三个点
+                int i2 = i1+1;
+                if (i2 >= edges.size()) {
+                    i2 = 0;
+                }
+                int i3 = i2+1;
+                if (i3 >= edges.size()) {
+                    i3 = 0;
+                }
+
+                Input p1 = edges.get(i1);
+                Input p2 = edges.get(i2);
+                Input p3 = edges.get(i3);
+                String key = String.format("3-%d:%d->%d:%d->%d:%d", p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+
+                if (!pointCheckCache.containsKey(key)) {
+                    pointCheckCache.put(key, PassMap.removePointCompute3(matrix, edges, i1, i2, i3));
+                }
+
+                // p1 和 p3 连线，p2 依然在图内时，可以删除 p2
+                boolean couldRemoveP2 = pointCheckCache.get(key);
+                if (couldRemoveP2) {
+                    // 能删除则更新存档点为p1，以 p1 为起始点再次执行
+                    List<Input> newEdges = new ArrayList<>(edges);
+                    newEdges.remove(i2);
+
+                    //System.out.println("remove point:" + inputToString(p2));
+                    edges = newEdges;
+                    storePoint = Math.min(i1, edges.size() - 1 );;
+                    // 此处 p1 保持不变，所以 i1 不变
+                } else {
+                    // 不能则以 p2 为起始点继续执行
+                    i1++;
+                    if (i1 >= edges.size()) {
+                        i1 = 0;
+                    }
+                    // 如果再次遇到存档点，则结束处理
+                    if (i1 == storePoint) {
+                        // 环形遍历控制，第一遍只移除边上的点，第二遍简化图形
+                        break;
+                    }
+                }
+            }
+
 
             storePoint = 0;
             i1 = 0;
@@ -871,6 +1344,84 @@ public class Solution {
             return new Line(p1.x, p1.y, p2.x, p2.y);
         }
 
+        public static boolean hasCross(List<Line> lines) {
+            // 相邻的不用看
+            for (int i = 0; i < lines.size(); i++) {
+                for (int j = 0; j < lines.size(); j++) {
+                    if (i==j) {
+                        continue;
+                    }
+                    Line l1 = lines.get(i);
+                    Line l2 = lines.get(j);
+                    if (l1.x2 == l2.x1 && l1.y2 == l2.y1) {
+                        continue;
+                    }
+                    if (l1.x1 == l2.x2 && l1.y1 == l2.y2) {
+                        continue;
+                    }
+                    BigDecimal n1 = l1.getN().setScale(6, RoundingMode.HALF_UP);
+                    BigDecimal n2 = l2.getN().setScale(6, RoundingMode.HALF_UP);
+                    BigDecimal c1 = l1.getC().setScale(6, RoundingMode.HALF_UP);
+                    BigDecimal c2 = l2.getC().setScale(6, RoundingMode.HALF_UP);
+
+                    // case 1 如果有一方的 n 为 0
+                    if (BigDecimal.valueOf(0).equals(n1) || BigDecimal.valueOf(0).equals(n2)) {
+                        Line la = l1;
+                        Line lb = l2;
+                        if (!BigDecimal.valueOf(0).equals(n1)) {
+                            lb = l1;
+                            la = l2;
+                        }
+                        // 此处 la 的 n 为 0， lb 未知
+                        if (la.x1 == la.x2) { // 竖线
+                            if (la.x1 > Math.max(lb.x1, lb.x2) || la.x1 < Math.min(lb.x1, lb.x2)) {
+                                continue;
+                            }
+                            BigDecimal y = n2.multiply(BigDecimal.valueOf(la.x1)).add(c2).setScale(6, RoundingMode.HALF_UP);
+                            if (y.compareTo(BigDecimal.valueOf(la.y1)) != 0 && y.compareTo(BigDecimal.valueOf(la.y1)) + y.compareTo(BigDecimal.valueOf(la.y2)) == 0) {
+                                return true;
+                            }
+                        } else { // 横线
+
+                            if (la.y1 > Math.max(lb.y1, lb.y2) || la.y1 < Math.min(lb.y1, lb.y2)) {
+                                continue;
+                            }
+                            BigDecimal x = BigDecimal.valueOf(la.y1).subtract(c2).divide(n2, 6, RoundingMode.HALF_UP).setScale(6, RoundingMode.HALF_UP);
+
+                            if (x.compareTo(BigDecimal.valueOf(la.x1)) != 0 && x.compareTo(BigDecimal.valueOf(la.x1)) + x.compareTo(BigDecimal.valueOf(la.x2)) == 0) {
+                                return true;
+                            }
+                        }
+                        continue;
+                    }
+                    // case 2 n2 = n1
+                    if (n1.equals(n2)) {
+                        if (!c1.equals(c2)) {
+                            continue;
+                        } else if (l1.contains(l2.x1, l2.y1)
+                                || l1.contains(l2.x2, l2.y2)
+                                || l2.contains(l1.x1, l1.y1)
+                                || l2.contains(l1.x2, l1.y2)) {
+                            return true;
+                        }
+                        continue;
+                    }
+                    // case 3
+                    BigDecimal x = c2.subtract(c1).divide(n1.subtract(n2), 6, RoundingMode.HALF_UP).setScale(6, RoundingMode.HALF_UP);
+                    BigDecimal y = n1.multiply(x).add(c1);
+                    // n1*x+c1 = n2*x+c2
+                    // x = (c2-c1) / (n1-n2)
+                    if (x.compareTo(BigDecimal.valueOf(l1.x1)) + x.compareTo(BigDecimal.valueOf(l1.x2)) == 0
+                    && x.compareTo(BigDecimal.valueOf(l2.x1)) + x.compareTo(BigDecimal.valueOf(l2.x2)) == 0
+                    && y.compareTo(BigDecimal.valueOf(l1.y1)) + y.compareTo(BigDecimal.valueOf(l1.y2)) == 0
+                    && y.compareTo(BigDecimal.valueOf(l2.y1)) + y.compareTo(BigDecimal.valueOf(l2.y2)) == 0) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         public boolean contains(int x, int y) {
             Line newLine = new Line(x1, y1, x, y);
             if (!newLine.equals(this))  {
@@ -917,7 +1468,38 @@ public class Solution {
             return list;
         }
 
+        public int[] getNextPoint(int maxSize) {
+            if (x1 == x2) {
+                if (y1 > y2) {
+                    return new int[]{x1, y1 + 1};
+                } else if (y1 < y2) {
+                    return new int[]{x1, y2 + 1};
+                } else {
+                    return new int[]{-1, -1};
+                }
+            } else if (x1 > x2) {
+                for (int i = x2-1;i > -1; i--) {
+                    BigDecimal y = getN().multiply(BigDecimal.valueOf(i)).add(getC()).setScale(6, RoundingMode.HALF_UP);
+                    if (isIntegerValue(y)) {
+                        return new int[]{i, y.intValue()};
+                    }
+                }
+            } else {
+                for (int i = x2+1;i < maxSize + 2; i++) {
+                    BigDecimal y = getN().multiply(BigDecimal.valueOf(i)).add(getC()).setScale(6, RoundingMode.HALF_UP);
+                    if (isIntegerValue(y)) {
+                        return new int[]{i, y.intValue()};
+                    }
+                }
+            }
+            return new int[]{-1, -1};
+        }
+
         public BigDecimal getN() {
+            // n*x1 + c = y1
+            // n*x2 + c = y2
+            // n*(x2-x1) = y2 - y1
+            // n = (y2-y1)/(x2-x1)
             if (n != null) {
                 return n;
             }
