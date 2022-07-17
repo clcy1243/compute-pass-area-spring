@@ -48,10 +48,10 @@ class SolutionTest {
         Line l2 = new Line(0, 0, -1, 1); // 90 - 180˚
         Line l3 = new Line(0, 0, 1, -1); // -0 - -90˚
         Line l4 = new Line(0, 0, -1, -1); // -0 - -180˚
-        log.info("l1 N:" + l1.getN() + " C:" + l1.getC() + " V:"+ l1.vector); // n > 0 v = false
-        log.info("l2 N:" + l2.getN() + " C:" + l2.getC() + " V:"+ l2.vector); // n < 0 v = true
-        log.info("l3 N:" + l3.getN() + " C:" + l3.getC() + " V:"+ l3.vector); // n < 0 v = false
-        log.info("l4 N:" + l4.getN() + " C:" + l4.getC() + " V:"+ l4.vector); // n > 0 v = true
+        log.info("l1 N:" + l1.getN() + " C:" + l1.getC() + " V:" + l1.vector); // n > 0 v = false
+        log.info("l2 N:" + l2.getN() + " C:" + l2.getC() + " V:" + l2.vector); // n < 0 v = true
+        log.info("l3 N:" + l3.getN() + " C:" + l3.getC() + " V:" + l3.vector); // n < 0 v = false
+        log.info("l4 N:" + l4.getN() + " C:" + l4.getC() + " V:" + l4.vector); // n > 0 v = true
     }
 
     @Test
@@ -61,8 +61,16 @@ class SolutionTest {
         Line l3 = new Line(81, 127, 79, 128);
         Line l4 = new Line(79, 128, 67, 103);
 
-        boolean a = Line.hasCross(Arrays.asList(l1, l2, l3, l4));
-        assertTrue(a);
+        //boolean a = Line.hasCross(Arrays.asList(l1, l2, l3, l4));
+        //assertTrue(a);
+
+        l1 = new Line(109, 34, 109, 84);
+        l2 = new Line(109, 84, 108, 81);
+        l3 = new Line(108, 81, 128, 45);
+        l4 = new Line(128, 45, 109, 34);
+
+        boolean b = Line.hasCross(Arrays.asList(l1, l2, l3, l4));
+        assertTrue(b);
     }
 
     @Test
@@ -73,9 +81,9 @@ class SolutionTest {
         int inOldFail = 0;
         int inNewPass = 1;
         int inOldPass = 5;
-        int addScore = (p1==p3 ?  6 : 3 // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
-                + ( (inNewFail - inOldFail) * -10) // 多的 fail 点的分数
-                + ( (inNewPass - inOldPass) * 5));
+        int addScore = (p1 == p3 ? 6 : 3 // 一条边的分数, 假设 p1 p3 相同，实际上会少两条边
+                + ((inNewFail - inOldFail) * -10) // 多的 fail 点的分数
+                + ((inNewPass - inOldPass) * 5));
         assertEquals(-14, addScore);
     }
 

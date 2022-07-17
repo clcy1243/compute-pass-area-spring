@@ -83,7 +83,7 @@ public class Solution {
         for (PassMap passMap : passMapList) {
             // 分为两部，第一步去掉边上的点，第二步减少顶点
             passMap.removePointAtLine();
-            passMap.removePointCompute();
+            passMap.removePointCompute(passMapList);
         }
         List<PassMap> newPassMapList = new ArrayList<>();
         for (PassMap passMap : passMapList) {
@@ -493,7 +493,8 @@ public class Solution {
         }
 
         // 顺时针增点
-        public static boolean extendLineCompute(Matrix matrix, List<Input> inputs, int currentIndex) {
+        public static boolean extendLineCompute(Matrix matrix, List<Input> inputs, int currentIndex,
+                List<PassMap> passMapList) {
             Input p1 = inputs.get(currentIndex);
             Input p2 = inputs.get((currentIndex+1)%inputs.size());
             Input p3 = inputs.get((currentIndex+2)%inputs.size());
@@ -508,13 +509,21 @@ public class Solution {
                 return false;
             }
 
+            for (PassMap passMap : passMapList) {
+                if (passMap.edges != inputs) {
+                    if (PassMap.contains(passMap.edges, po)) {
+                        return false;
+                    }
+                }
+            }
+
             // 1. 以 p1 p2 p3 三点所占用的空间，得到一个矩形，
             int minX = po.x;
             int minY = po.y;
             int maxX = po.x;
             int maxY = po.y;
 
-            for (Input p : inputs) {
+            for (Input p : Arrays.asList(p1,p2,p3)) {
                 minX = Math.min(minX, p.x);
                 minY = Math.min(minY, p.y);
                 maxX = Math.max(maxX, p.x);
@@ -657,7 +666,8 @@ public class Solution {
         }
 
         // 逆时针增点
-        public static boolean extendLineComputeRes(Matrix matrix, List<Input> inputs, int currentIndex) {
+        public static boolean extendLineComputeRes(Matrix matrix, List<Input> inputs, int currentIndex,
+                List<PassMap> passMapList) {
             Input p1 = inputs.get(currentIndex);
             int p2Index = (currentIndex-1 + inputs.size())%inputs.size();
             int p3Index = (currentIndex-2 + inputs.size())%inputs.size();
@@ -674,13 +684,21 @@ public class Solution {
                 return false;
             }
 
+            for (PassMap passMap : passMapList) {
+                if (passMap.edges != inputs) {
+                    if (PassMap.contains(passMap.edges, po)) {
+                        return false;
+                    }
+                }
+            }
+
             // 1. 以 p1 p2 p3 三点所占用的空间，得到一个矩形，
             int minX = po.x;
             int minY = po.y;
             int maxX = po.x;
             int maxY = po.y;
 
-            for (Input p : inputs) {
+            for (Input p : Arrays.asList(p1,p2,p3)) {
                 minX = Math.min(minX, p.x);
                 minY = Math.min(minY, p.y);
                 maxX = Math.max(maxX, p.x);
@@ -1067,7 +1085,7 @@ public class Solution {
 
         }
 
-        public void removePointCompute() {
+        public void removePointCompute(List<PassMap> passMapList) {
             // 图形优化时，应先对边上的点进行清楚，再进行下一步的图形简化，
             // 有 case 说明简化时有可能因为边上的顶点移除和图形简化在一步内做，
             // 导致逐渐包含fail点最终导致fail点过多的问题
@@ -1135,7 +1153,7 @@ public class Solution {
                 String key = String.format("a-3-%d:%d->%d:%d->%d:%d", p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
 
                 if (!pointCheckCache.containsKey(key)) {
-                    pointCheckCache.put(key, PassMap.extendLineCompute(matrix, edges, i1));
+                    pointCheckCache.put(key, PassMap.extendLineCompute(matrix, edges, i1, passMapList));
                 }
 
                 boolean couldRemove = pointCheckCache.get(key);
@@ -1169,7 +1187,7 @@ public class Solution {
                 String key = String.format("a-3-%d:%d->%d:%d->%d:%d", p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
 
                 if (!pointCheckCache.containsKey(key)) {
-                    pointCheckCache.put(key, PassMap.extendLineComputeRes(matrix, edges, i1));
+                    pointCheckCache.put(key, PassMap.extendLineComputeRes(matrix, edges, i1, passMapList));
                 }
 
                 boolean couldRemove = pointCheckCache.get(key);
@@ -1365,14 +1383,60 @@ public class Solution {
                     BigDecimal c2 = l2.getC().setScale(6, RoundingMode.HALF_UP);
 
                     // case 1 如果有一方的 n 为 0
-                    if (BigDecimal.valueOf(0).equals(n1) || BigDecimal.valueOf(0).equals(n2)) {
+                    if (BigDecimal.valueOf(0).compareTo(n1) == 0 || BigDecimal.valueOf(0).compareTo(n2) == 0) {
                         Line la = l1;
                         Line lb = l2;
-                        if (!BigDecimal.valueOf(0).equals(n1)) {
+                        if (BigDecimal.valueOf(0).compareTo(n1) != 0) {
                             lb = l1;
                             la = l2;
                         }
                         // 此处 la 的 n 为 0， lb 未知
+
+                        if (lb.getN().compareTo(BigDecimal.ZERO) == 0) {
+                            if (la.x1 == la.x2) { // 竖线
+                                if (lb.x1 == lb.x2) {
+                                    // 同时为竖线
+                                    if (la.x1 == lb.x1) {
+                                        if (la.contains(lb.x1, lb.y1) || la.contains(lb.x2, lb.y2) ) {
+                                            return true;
+                                        }
+                                    }
+                                } else {
+                                    // la 竖线 lb 横线
+                                    // 不相交条件 竖线的x不在横线x范围内
+                                    //       或  横线的y不在竖线的y范围之内
+                                    if (la.x1 > Math.max(lb.x1, lb.x2) || la.x1 < Math.min(lb.x1, lb.x2)) {
+                                        continue;
+                                    }
+
+                                    if (lb.y1 > Math.max(la.y1, la.y2) || lb.y1 < Math.min(la.y1, la.y2)) {
+                                        continue;
+                                    }
+                                }
+                            } else { // 横线
+                                if (lb.x1 == lb.x2) {
+                                    // la 横线 lb 竖线
+                                    // 不相交条件 竖线的x不在横线x范围内
+                                    //       或  横线的y不在竖线的y范围之内
+                                    if (lb.x1 > Math.max(la.x1, la.x2) || lb.x1 < Math.min(la.x1, la.x2)) {
+                                        continue;
+                                    }
+
+                                    if (la.y1 > Math.max(lb.y1, lb.y2) || la.y1 < Math.min(lb.y1, lb.y2)) {
+                                        continue;
+                                    }
+                                } else {
+                                    // 同时为横线
+                                    if (la.x1 != lb.x1) {
+                                        if (la.contains(lb.x1, lb.y1) || la.contains(lb.x2, lb.y2) ) {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+
                         if (la.x1 == la.x2) { // 竖线
                             if (la.x1 > Math.max(lb.x1, lb.x2) || la.x1 < Math.min(lb.x1, lb.x2)) {
                                 continue;
@@ -1386,7 +1450,9 @@ public class Solution {
                             if (la.y1 > Math.max(lb.y1, lb.y2) || la.y1 < Math.min(lb.y1, lb.y2)) {
                                 continue;
                             }
-                            BigDecimal x = BigDecimal.valueOf(la.y1).subtract(c2).divide(n2, 6, RoundingMode.HALF_UP).setScale(6, RoundingMode.HALF_UP);
+
+
+                            BigDecimal x = BigDecimal.valueOf(la.y1).subtract(c2).divide(lb.getN(), 6, RoundingMode.HALF_UP).setScale(6, RoundingMode.HALF_UP);
 
                             if (x.compareTo(BigDecimal.valueOf(la.x1)) != 0 && x.compareTo(BigDecimal.valueOf(la.x1)) + x.compareTo(BigDecimal.valueOf(la.x2)) == 0) {
                                 return true;
